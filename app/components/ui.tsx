@@ -26,14 +26,13 @@ export function Button({
         padding: "8px 14px",
         borderRadius: 6,
         border: "1px solid #cfcfcf",
-        background: "#ffffff",
-        color: "#1b1b1b",
+        background: variant === "primary" ? "#1f2937" : "#ffffff",
+        color: variant === "primary" ? "#ffffff" : "#1b1b1b",
+        borderColor: variant === "primary" ? "#1f2937" : "#cfcfcf",
         cursor: "pointer",
-        ...(variant === "primary"
-          ? { background: "#1f2937", color: "#ffffff", borderColor: "#1f2937" }
-          : variant === "danger"
-            ? { color: "#a10d0d", borderColor: "#a10d0d" }
-            : {})
+        ...(variant === "danger"
+          ? { color: "#a10d0d", borderColor: "#a10d0d" }
+          : {})
       }}
     >
       {children}

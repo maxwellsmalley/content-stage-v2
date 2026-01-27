@@ -78,6 +78,7 @@ export default function ProjectOverviewPage() {
 
   useEffect(() => {
     async function checkAccess() {
+      if (!user) return;
       if (isSuperAdmin || isWorkspaceAdmin) {
         setHasAccess(true);
         return;
