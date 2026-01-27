@@ -1,8 +1,0 @@
-{
-  "/auth/page": "app/auth/page.js",
-  "/page": "app/page.js",
-  "/workspaces/[workspaceId]/page": "app/workspaces/[workspaceId]/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/workspaces/[workspaceId]/projects/[projectId]/page": "app/workspaces/[workspaceId]/projects/[projectId]/page.js",
-  "/workspaces/[workspaceId]/projects/[projectId]/pages/[pageId]/page": "app/workspaces/[workspaceId]/projects/[projectId]/pages/[pageId]/page.js"
-}
