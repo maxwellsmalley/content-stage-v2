@@ -19,17 +19,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           background: "#ffffff"
         }}
       >
-        <div
-          style={{
-            maxWidth: 980,
-            margin: "0 auto",
-            padding: "16px 24px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16
-          }}
-        >
+        <div className="app-shell-header">
           <div className="row" style={{ gap: 12 }}>
             <Link
               href={workspaceId ? `/workspaces/${workspaceId}` : "/"}
