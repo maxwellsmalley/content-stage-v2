@@ -55,6 +55,7 @@ function fileNameFromUrl(src?: string) {
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_MEDIA_GALLERY = 6;
 const RECOMMENDED_IMAGE_HINT = "Recommended: 1920×1080 px. Max file size 5MB.";
+const PREVIEW_IMAGE_ASPECT = "16:9";
 
 function aspectRatioValue(value?: string) {
   switch (value) {
@@ -68,6 +69,39 @@ function aspectRatioValue(value?: string) {
     default:
       return "16 / 9";
   }
+}
+
+function PreviewImageFrame({
+  src,
+  alt,
+  aspectRatio = PREVIEW_IMAGE_ASPECT
+}: {
+  src?: string;
+  alt?: string;
+  aspectRatio?: string;
+}) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: aspectRatioValue(aspectRatio),
+        overflow: "hidden",
+        borderRadius: 6,
+        background: "#efefef"
+      }}
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={alt || "Preview image"}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        />
+      ) : (
+        <div style={{ width: "100%", height: "100%" }} />
+      )}
+    </div>
+  );
 }
 
 function blockHasContent(blockType: BlockType, fields: BlockFields) {
@@ -2142,20 +2176,23 @@ function BlockPreview({
           style={{
             position: "relative",
             padding: 16,
-            minHeight: 160,
             background: data.media?.src ? "#d9e1ea" : "#f2f2f2",
             display: "flex",
-            alignItems: "center"
+            alignItems: "center",
+            aspectRatio: aspectRatioValue(PREVIEW_IMAGE_ASPECT),
+            overflow: "hidden"
           }}
         >
           {data.media?.src && (
-            <div
+            <img
+              src={data.media.src}
+              alt={data.media?.alt || "Hero media"}
               style={{
                 position: "absolute",
                 inset: 0,
-                backgroundImage: `url(${data.media.src})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
                 opacity: 0.6
               }}
             />
@@ -2239,13 +2276,10 @@ function BlockPreview({
               }}
             >
               <div className="stack" style={{ gap: 6 }}>
-                <div
-                  style={{
-                    borderRadius: 4,
-                    background: card.imageUrl ? `url(${card.imageUrl}) center / cover` : "#eaeaea",
-                    aspectRatio: aspectRatioValue(data.imageAspectRatio),
-                    width: "100%"
-                  }}
+                <PreviewImageFrame
+                  src={card.imageUrl}
+                  alt={card.imageAlt}
+                  aspectRatio={data.imageAspectRatio || PREVIEW_IMAGE_ASPECT}
                 />
                 {hasText(card.eyebrow) && (
                   <span style={{ fontSize: 10, color: "#7a7a7a", letterSpacing: 0.6, textTransform: "uppercase" }}>
@@ -2317,14 +2351,9 @@ function BlockPreview({
       textAlign === "left" ? "flex-start" : textAlign === "center" ? "center" : "flex-end";
     const hasMedia = Boolean(data.media?.src);
     const imageBlock = hasMedia ? (
-      <div
-        style={{
-          width: 96,
-          height: 72,
-          borderRadius: 6,
-          background: `url(${data.media.src}) center / cover no-repeat`
-        }}
-      />
+      <div style={{ width: 120 }}>
+        <PreviewImageFrame src={data.media.src} alt={data.media?.alt} />
+      </div>
     ) : null;
     return (
       <div
@@ -2397,13 +2426,7 @@ function BlockPreview({
     );
     const imageBlock = (
       <div className="stack" style={{ gap: 6 }}>
-        <div
-          style={{
-            height: 120,
-            borderRadius: 6,
-            background: data.media?.src ? `url(${data.media.src}) center / cover` : "#efefef"
-          }}
-        />
+        <PreviewImageFrame src={data.media?.src} alt={data.media?.alt} />
         {hasText(data.media?.caption) && (
           <span className="muted" style={{ fontSize: 11 }}>
             {data.media.caption}
@@ -2438,7 +2461,7 @@ function BlockPreview({
   if (blockType === "media") {
     const gallery = Array.isArray(data.gallery) ? data.gallery : [];
     const showGallery = gallery.length > 0;
-    const ratio = aspectRatioValue(data.media?.aspectRatio);
+    const ratio = data.media?.aspectRatio || PREVIEW_IMAGE_ASPECT;
     return (
       <div className="stack" style={{ gap: 8 }}>
         {showGallery ? (
@@ -2458,63 +2481,43 @@ function BlockPreview({
                 <div
                   key={`${item.src}-${idx}`}
                   style={{
-                    border: "1px solid #e3e3e3",
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    background: "#f2f2f2",
                     minWidth: 160,
-                    aspectRatio: ratio,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center"
                   }}
                 >
-                  {item?.src ? (
-                    <img
-                      src={item.src}
-                      alt={item?.alt || "Gallery image"}
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                  ) : (
-                    <span className="muted" style={{ fontSize: 12 }}>
-                      No media
-                    </span>
-                  )}
+                  <PreviewImageFrame src={item?.src} alt={item?.alt} aspectRatio={ratio} />
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div
-            style={{
-              border: "1px solid #e3e3e3",
-              borderRadius: 8,
-              overflow: "hidden",
-              background: "#f2f2f2",
-              aspectRatio: ratio,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center"
-            }}
-          >
-            {data.media?.src ? (
-              data.media?.type === "video" ? (
-                <video
-                  controls
-                  src={data.media.src}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <img
-                  src={data.media.src}
-                  alt={data.media?.alt || "Media preview"}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              )
+          <div style={{ borderRadius: 8, overflow: "hidden" }}>
+            {data.media?.type === "video" ? (
+              <div
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  aspectRatio: aspectRatioValue(ratio),
+                  overflow: "hidden",
+                  background: "#efefef"
+                }}
+              >
+                {data.media?.src ? (
+                  <video
+                    controls
+                    src={data.media.src}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    No media
+                  </span>
+                )}
+              </div>
             ) : (
-              <span className="muted" style={{ fontSize: 12 }}>
-                No media
-              </span>
+              <PreviewImageFrame src={data.media?.src} alt={data.media?.alt} aspectRatio={ratio} />
             )}
           </div>
         )}
