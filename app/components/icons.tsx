@@ -51,7 +51,7 @@ export function IconGlyph({ name }: { name: string }) {
     strokeWidth: 1.6,
     strokeLinecap: "round",
     strokeLinejoin: "round"
-  };
+  } as const;
   switch (name) {
     case "chevron-right":
       return (

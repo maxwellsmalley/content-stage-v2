@@ -519,7 +519,13 @@ function IconButton({
 
 function Icon({ name }: { name: string }) {
   const stroke = "currentColor";
-  const common = { fill: "none", stroke, strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round" };
+  const common = {
+    fill: "none",
+    stroke,
+    strokeWidth: 1.6,
+    strokeLinecap: "round",
+    strokeLinejoin: "round"
+  } as const;
   switch (name) {
     case "chevron-right":
       return (
@@ -691,8 +697,6 @@ function BlockPalette({
 
 function BlockPaletteIcon({ type }: { type: BlockType }) {
   const common = {
-    width: 20,
-    height: 20,
     stroke: "#4b4b4b",
     fill: "none",
     strokeWidth: 1.6,

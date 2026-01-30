@@ -379,7 +379,7 @@ export async function exportPage(
     docParagraphs.push(new Paragraph({ text: "" }));
   });
 
-  const doc = new Document({
+  const handoverDoc = new Document({
     sections: [
       {
         properties: {},
@@ -388,7 +388,7 @@ export async function exportPage(
     ]
   });
 
-  const docBlob = await Packer.toBlob(doc);
+  const docBlob = await Packer.toBlob(handoverDoc);
   downloadBlob(`content-stage-page-${slug || pageSnapshot.id}-handover.docx`, docBlob);
 
   const jsonPayload = {
