@@ -10,47 +10,103 @@ export type BlockType =
   | "tab_content"
   | "media";
 
+export type HeadingLevel = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+
+export type HeadingField = {
+  text: string;
+  level: HeadingLevel;
+};
+
+export type ButtonField = {
+  label: string;
+  url: string;
+};
+
+export type MediaField = {
+  src: string;
+  alt: string;
+  caption?: string;
+  type?: "image" | "video";
+  aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4";
+  fullWidth?: boolean;
+  fileName?: string;
+};
+
 export type HeroFields = {
-  headline: string;
-  subheadline: string;
-  primaryCtaLabel: string;
-  primaryCtaUrl: string;
-  mediaUrl: string;
+  heading: HeadingField;
+  body: string;
+  primaryButton: ButtonField;
+  secondaryButton: ButtonField;
+  media: MediaField;
+  textAlignment: "left" | "center" | "right";
+  mediaAlignment: "left" | "right";
+  behindMediaOverlay: boolean;
+  variant: string;
+  textColor: "black" | "white";
 };
 
 export type BannerFields = {
-  text: string;
-  linkLabel: string;
-  linkUrl: string;
+  heading: HeadingField;
+  body: string;
+  primaryButton: ButtonField;
+  secondaryButton: ButtonField;
+  media: MediaField;
+  textAlignment: "left" | "center" | "right";
+  mediaAlignment: "left" | "right";
+  backgroundMode: "background" | "behind_media";
+  backgroundImageUrl: string;
+  backgroundColor: string;
+  imageFitToTextHeight: boolean;
+  variant: string;
+  textColor: "black" | "white";
 };
 
 export type ContentFields = {
-  heading: string;
+  heading: HeadingField;
   body: string;
+  primaryButton: ButtonField;
+  secondaryButton: ButtonField;
+  media: MediaField;
+  imagePosition: "left" | "right" | "above" | "below";
+  eyebrow: string;
+  variant: string;
 };
 
 export type CardListFields = {
-  heading: string;
+  heading: HeadingField;
+  description: string;
+  primaryButton: ButtonField;
   cards: Array<{
-    title: string;
-    body: string;
-    linkLabel: string;
-    linkUrl: string;
+    heading: string;
+    description: string;
+    imageUrl: string;
+    imageAlt: string;
+    eyebrow: string;
+    button: ButtonField;
   }>;
+  displayMode: "grid" | "carousel";
+  columns: 2 | 3 | 4;
+  imagePosition: "top" | "left" | "background";
+  imageAspectRatio: "16:9" | "4:3" | "1:1" | "3:4";
 };
 
 export type TabContentFields = {
-  heading: string;
+  mainHeading: HeadingField;
+  mainDescription: string;
   tabs: Array<{
-    label: string;
-    content: string;
+    name: string;
+    heading: HeadingField;
+    body: string;
+    button: ButtonField;
+    media: MediaField;
+    imagePosition: "left" | "right" | "above" | "below";
+    eyebrow: string;
   }>;
 };
 
 export type MediaFields = {
-  mediaUrl: string;
-  caption: string;
-  mediaType: "image" | "video";
+  media: MediaField;
+  gallery?: MediaField[];
 };
 
 export type BlockFields =
@@ -74,6 +130,12 @@ export type Page = {
   status: PageStatus;
   order: number;
   folderId?: string | null;
+};
+
+export type Folder = {
+  id: string;
+  name: string;
+  parentId?: string | null;
 };
 
 export type Project = {

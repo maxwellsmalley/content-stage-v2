@@ -21,40 +21,83 @@ export function createDefaultFields(type: BlockType) {
   switch (type) {
     case "hero":
       return {
-        headline: "",
-        subheadline: "",
-        primaryCtaLabel: "",
-        primaryCtaUrl: "",
-        mediaUrl: ""
+        heading: { text: "", level: "h1" },
+        body: "",
+        primaryButton: { label: "", url: "" },
+        secondaryButton: { label: "", url: "" },
+        media: { src: "", type: "image", alt: "" },
+        textAlignment: "left",
+        mediaAlignment: "right",
+        behindMediaOverlay: false,
+        variant: "",
+        textColor: "black"
       } satisfies HeroFields;
     case "banner":
       return {
-        text: "",
-        linkLabel: "",
-        linkUrl: ""
+        heading: { text: "", level: "h2" },
+        body: "",
+        primaryButton: { label: "", url: "" },
+        secondaryButton: { label: "", url: "" },
+        media: { src: "", type: "image", alt: "" },
+        textAlignment: "left",
+        mediaAlignment: "right",
+        backgroundMode: "background",
+        backgroundImageUrl: "",
+        backgroundColor: "",
+        imageFitToTextHeight: false,
+        variant: "",
+        textColor: "black"
       } satisfies BannerFields;
     case "content":
       return {
-        heading: "",
-        body: ""
+        heading: { text: "", level: "h2" },
+        body: "",
+        primaryButton: { label: "", url: "" },
+        secondaryButton: { label: "", url: "" },
+        media: { src: "", type: "image", alt: "", caption: "" },
+        imagePosition: "right",
+        eyebrow: "",
+        variant: ""
       } satisfies ContentFields;
     case "card_list":
       return {
-        heading: "",
-        cards: []
+        heading: { text: "", level: "h2" },
+        description: "",
+        primaryButton: { label: "", url: "" },
+        cards: [],
+        displayMode: "grid",
+        columns: 3,
+        imagePosition: "top",
+        imageAspectRatio: "16:9"
       } satisfies CardListFields;
     case "tab_content":
       return {
-        heading: "",
+        mainHeading: { text: "", level: "h2" },
+        mainDescription: "",
         tabs: []
       } satisfies TabContentFields;
     case "media":
       return {
-        mediaUrl: "",
-        caption: "",
-        mediaType: "image"
+        media: {
+          src: "",
+          type: "image",
+          alt: "",
+          caption: "",
+          aspectRatio: "16:9",
+          fullWidth: false
+        },
+        gallery: []
       } satisfies MediaFields;
     default:
-      return { heading: "", body: "" } satisfies ContentFields;
+      return {
+        heading: { text: "", level: "h2" },
+        body: "",
+        primaryButton: { label: "", url: "" },
+        secondaryButton: { label: "", url: "" },
+        media: { src: "", type: "image", alt: "", caption: "" },
+        imagePosition: "right",
+        eyebrow: "",
+        variant: ""
+      } satisfies ContentFields;
   }
 }

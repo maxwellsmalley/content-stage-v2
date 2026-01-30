@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -113,5 +114,15 @@ export async function savePageOrder(
     doc(db, "workspaces", workspaceId, "projects", projectId, "pages", pageId),
     { order },
     { merge: true }
+  );
+}
+
+export async function deletePage(
+  workspaceId: string,
+  projectId: string,
+  pageId: string
+) {
+  await deleteDoc(
+    doc(db, "workspaces", workspaceId, "projects", projectId, "pages", pageId)
   );
 }

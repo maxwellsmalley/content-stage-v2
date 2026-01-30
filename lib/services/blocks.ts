@@ -12,6 +12,32 @@ import {
 import { db } from "@/lib/firebase";
 import { Block, BlockFields, BlockType } from "../models/types";
 
+function sanitizeMedia(media: any) {
+  if (!media) return media;
+  return {
+    src: String(media.src || ""),
+    alt: String(media.alt || ""),
+    caption: String(media.caption || "")
+  };
+}
+
+function sanitizeFields(fields: BlockFields): BlockFields {
+  const next: any = { ...fields };
+  if ("media" in next) {
+    next.media = sanitizeMedia(next.media);
+  }
+  if ("gallery" in next && Array.isArray(next.gallery)) {
+    next.gallery = next.gallery.map((item: any) => sanitizeMedia(item));
+  }
+  if ("tabs" in next && Array.isArray(next.tabs)) {
+    next.tabs = next.tabs.map((tab: any) => ({
+      ...tab,
+      media: sanitizeMedia(tab.media)
+    }));
+  }
+  return next as BlockFields;
+}
+
 export async function listBlocks(
   workspaceId: string,
   projectId: string,
@@ -47,6 +73,8 @@ export async function addBlock(
   type: BlockType,
   fields: BlockFields
 ) {
+  const sanitizedFields = sanitizeFields(fields);
+  console.log("Saving block fields", sanitizedFields);
   await addDoc(
     collection(
       db,
@@ -60,7 +88,7 @@ export async function addBlock(
     ),
     {
       type,
-      fields,
+      fields: sanitizedFields,
       order: Date.now()
     }
   );
@@ -73,6 +101,8 @@ export async function updateBlockFields(
   blockId: string,
   fields: BlockFields
 ) {
+  const sanitizedFields = sanitizeFields(fields);
+  console.log("Saving block fields", sanitizedFields);
   await updateDoc(
     doc(
       db,
@@ -85,7 +115,7 @@ export async function updateBlockFields(
       "blocks",
       blockId
     ),
-    { fields }
+    { fields: sanitizedFields }
   );
 }
 

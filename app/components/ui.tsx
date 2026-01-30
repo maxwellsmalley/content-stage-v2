@@ -9,19 +9,22 @@ export function Button({
   onClick,
   variant = "secondary",
   type = "button",
-  disabled
+  disabled,
+  className
 }: {
   children: React.ReactNode;
   onClick?: () => void;
   variant?: ButtonVariant;
   type?: "button" | "submit";
   disabled?: boolean;
+  className?: string;
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
+      className={className}
       style={{
         padding: "8px 14px",
         borderRadius: 6,

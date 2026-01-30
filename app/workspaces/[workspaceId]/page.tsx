@@ -13,6 +13,8 @@ import {
 } from "@/lib/services/projects";
 import { getWorkspace } from "@/lib/services/workspaces";
 import { Project } from "@/lib/models/types";
+import { listPages } from "@/lib/services/pages";
+import { listFolders } from "@/lib/services/folders";
 
 export default function WorkspacePage() {
   const params = useParams<{ workspaceId: string }>();
@@ -21,6 +23,10 @@ export default function WorkspacePage() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectName, setNewProjectName] = useState("");
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [projectStats, setProjectStats] = useState<
+    Record<string, { pages: number; folders: number }>
+  >({});
   const [status, setStatus] = useState("");
 
   const workspaceId = params.workspaceId;
@@ -52,6 +58,22 @@ export default function WorkspacePage() {
     }
     if (workspaceId && user) loadProjects();
   }, [workspaceId, user, systemRole, workspaceMembership]);
+
+  useEffect(() => {
+    async function loadStats() {
+      if (!workspaceId || projects.length === 0) return;
+      const stats: Record<string, { pages: number; folders: number }> = {};
+      for (const project of projects) {
+        const [pages, folders] = await Promise.all([
+          listPages(workspaceId, project.id),
+          listFolders(workspaceId, project.id)
+        ]);
+        stats[project.id] = { pages: pages.length, folders: folders.length };
+      }
+      setProjectStats(stats);
+    }
+    loadStats();
+  }, [workspaceId, projects]);
 
   async function handleCreateProject() {
     setStatus("");
@@ -96,48 +118,63 @@ export default function WorkspacePage() {
 
   return (
     <AppShell>
-      <div className="stack">
-        <div className="stack">
+      <div className="stack" style={{ gap: 12 }}>
+        <div className="stack" style={{ gap: 6 }}>
           <h1>{workspaceName}</h1>
-          <p className="muted">Projects in this workspace.</p>
+          <p className="muted">
+            This workspace includes {projects.length} projects.
+          </p>
         </div>
+        <div className="header-divider" />
 
-        {canCreateProject && (
-          <section className="surface" style={{ padding: 20 }}>
-            <div className="stack">
-              <h2>Create project</h2>
+        <section className="stack">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h2>Projects</h2>
+            {canCreateProject && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowAddProject((prev) => !prev)}
+              >
+                Add project
+              </Button>
+            )}
+          </div>
+          {showAddProject && canCreateProject && (
+            <div className="row" style={{ alignItems: "flex-end" }}>
               <Input
                 label="Project name"
                 value={newProjectName}
                 onChange={setNewProjectName}
               />
               <Button variant="primary" onClick={handleCreateProject}>
-                Create project
+                Add
               </Button>
             </div>
-          </section>
-        )}
-
-        <section className="stack">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <h2>Project list</h2>
-            <span className="tag">{projects.length} projects</span>
-          </div>
-          <div className="list">
-            {projects.map((project) => (
-              <Link
-                key={project.id}
-                href={`/workspaces/${workspaceId}/projects/${project.id}`}
-                className="list-item"
-              >
-                <strong>{project.name}</strong>
-                {project.description && (
-                  <p className="muted">{project.description}</p>
-                )}
-              </Link>
-            ))}
+          )}
+          <div className="stack">
+            {projects.map((project) => {
+              const stats = projectStats[project.id];
+              return (
+                <div
+                  key={project.id}
+                  className="project-row"
+                  onClick={() =>
+                    router.push(`/workspaces/${workspaceId}/projects/${project.id}`)
+                  }
+                >
+                  <div className="stack" style={{ gap: 4 }}>
+                    <strong>{project.name}</strong>
+                    <span className="project-meta">
+                      {stats
+                        ? `${stats.pages} pages · ${stats.folders} folders`
+                        : "Loading project details..."}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
             {projects.length === 0 && (
-              <div className="list-item muted">No projects available.</div>
+              <div className="row-item muted">No projects yet.</div>
             )}
           </div>
         </section>
