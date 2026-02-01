@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
+import type { CSSProperties } from "react";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { useParams, useRouter } from "next/navigation";
 import AppShell from "@/app/components/app-shell";
 import { Button, Input, Select, Textarea } from "@/app/components/ui";
 import { useAuth } from "@/app/components/auth-provider";
 import { exportPage } from "@/lib/services/exports";
-import { getPage, updatePageTitle } from "@/lib/services/pages";
+import { getPage, updatePageTitle, updatePageStatus } from "@/lib/services/pages";
 import Link from "next/link";
 import {
   addBlock,
@@ -17,7 +24,7 @@ import {
   updateBlockOrder
 } from "@/lib/services/blocks";
 import { hasProjectAccess } from "@/lib/services/projects";
-import { Block, BlockFields, BlockType, HeadingLevel } from "@/lib/models/types";
+import { Block, BlockFields, BlockType, HeadingLevel, PageStatus } from "@/lib/models/types";
 import { blockTypeLabels, createDefaultFields } from "@/lib/utils/block-templates";
 import { storage } from "@/lib/firebase";
 
@@ -36,6 +43,7 @@ function normalizeMedia(media?: any) {
     caption: "",
     type: "image",
     fileName: "",
+    displayMode: "landscape",
     ...(media || {})
   };
 }
@@ -56,6 +64,40 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_MEDIA_GALLERY = 6;
 const RECOMMENDED_IMAGE_HINT = "Recommended: 1920×1080 px. Max file size 5MB.";
 const PREVIEW_IMAGE_ASPECT = "16:9";
+const PREVIEW_TEXT_MAX = 520;
+const PREVIEW_SIDE_IMAGE = 180;
+const PREVIEW_GAP = 14;
+const PREVIEW_CARD_MIN = 200;
+
+function displayModeAspect(mode?: "landscape" | "portrait" | "square") {
+  switch (mode) {
+    case "portrait":
+      return "2 / 3";
+    case "square":
+      return "1 / 1";
+    case "landscape":
+    default:
+      return "3 / 2";
+  }
+}
+
+function previewPadding(mode?: "landscape" | "portrait" | "square") {
+  if (mode === "portrait") return 8;
+  return 6;
+}
+
+function previewRatioNumber(
+  mode?: "landscape" | "portrait" | "square",
+  aspectRatio?: string
+) {
+  if (mode === "portrait") return 2 / 3;
+  if (mode === "square") return 1;
+  if (mode === "landscape") return 3 / 2;
+  if (aspectRatio === "4:3") return 4 / 3;
+  if (aspectRatio === "1:1") return 1;
+  if (aspectRatio === "3:4") return 3 / 4;
+  return 16 / 9;
+}
 
 function aspectRatioValue(value?: string) {
   switch (value) {
@@ -74,28 +116,47 @@ function aspectRatioValue(value?: string) {
 function PreviewImageFrame({
   src,
   alt,
-  aspectRatio = PREVIEW_IMAGE_ASPECT
+  aspectRatio = PREVIEW_IMAGE_ASPECT,
+  displayMode,
+  backgroundColor,
+  allowFlex
 }: {
   src?: string;
   alt?: string;
   aspectRatio?: string;
+  displayMode?: "landscape" | "portrait" | "square";
+  backgroundColor?: string;
+  allowFlex?: boolean;
 }) {
+  const baseRatio = previewRatioNumber(displayMode, aspectRatio);
+  const ratio =
+    allowFlex && displayMode === "landscape"
+      ? baseRatio * 1.15
+      : allowFlex && displayMode === "portrait"
+        ? baseRatio * 0.85
+        : baseRatio;
   return (
     <div
       style={{
         position: "relative",
         width: "100%",
-        aspectRatio: aspectRatioValue(aspectRatio),
+        aspectRatio: ratio,
         overflow: "hidden",
         borderRadius: 6,
-        background: "#efefef"
+        background: backgroundColor || "#f2f2f2",
+        padding: previewPadding(displayMode)
       }}
     >
       {src ? (
         <img
           src={src}
           alt={alt || "Preview image"}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            objectPosition: "center"
+          }}
         />
       ) : (
         <div style={{ width: "100%", height: "100%" }} />
@@ -357,7 +418,12 @@ function MediaGalleryUpload({
                   `${uploadPath}/${Date.now()}-${file.name}`,
                   file
                 );
-                uploads.push({ src: uploadUrl, type: "image", fileName: file.name });
+                uploads.push({
+                  src: uploadUrl,
+                  type: "image",
+                  fileName: file.name,
+                  displayMode: "landscape"
+                });
               }
               if (uploads.length > 0) {
                 setError("");
@@ -642,28 +708,31 @@ const paletteBlocks: BlockType[] = [
   "media"
 ];
 
-function BlockPalette({
-  className,
-  expandedBlock,
-  onExpand,
-  onAdd
-}: {
-  className?: string;
-  expandedBlock: BlockType | null;
-  onExpand: (block: BlockType | null) => void;
-  onAdd: (block: BlockType) => void;
-}) {
+const BlockPalette = forwardRef<
+  HTMLDivElement,
+  {
+    className?: string;
+    expandedBlock: BlockType | null;
+    onExpand: (block: BlockType | null) => void;
+    onAdd: (block: BlockType) => void;
+    style?: CSSProperties;
+  }
+>(function BlockPalette(
+  { className, expandedBlock, onExpand, onAdd, style },
+  ref
+) {
   const selectedIndex = expandedBlock
     ? paletteBlocks.indexOf(expandedBlock)
     : -1;
   return (
     <div
       className={`palette ${className || ""}`}
+      ref={ref}
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 8,
-        position: "relative"
+        ...style
       }}
     >
       <div className="stack" style={{ gap: 8 }}>
@@ -727,7 +796,7 @@ function BlockPalette({
       )}
     </div>
   );
-}
+});
 
 function BlockPaletteIcon({ type }: { type: BlockType }) {
   const common = {
@@ -795,6 +864,10 @@ export default function PageEditor() {
   const router = useRouter();
   const { user, loading, systemRole, workspaceMembership } = useAuth();
   const [pageTitle, setPageTitle] = useState("");
+  const [pageStatus, setPageStatus] = useState<PageStatus>("draft");
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [expandedBlockIds, setExpandedBlockIds] = useState<string[]>([]);
   const [expandedPaletteBlock, setExpandedPaletteBlock] =
@@ -802,6 +875,19 @@ export default function PageEditor() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [hasAccess, setHasAccess] = useState(true);
+  const [paletteStyle, setPaletteStyle] = useState<CSSProperties>({});
+  const [usePaletteFallback, setUsePaletteFallback] = useState(false);
+  const paletteRef = useRef<HTMLDivElement | null>(null);
+  const blocksContainerRef = useRef<HTMLDivElement | null>(null);
+  const firstBlockRef = useRef<HTMLDivElement | null>(null);
+  const paletteMetricsRef = useRef<{
+    startTop: number;
+    startTopDoc: number;
+    left: number;
+    width: number;
+    blocksTopDoc: number;
+    blocksBottomDoc: number;
+  } | null>(null);
 
   const workspaceId = params.workspaceId;
   const projectId = params.projectId;
@@ -828,13 +914,131 @@ export default function PageEditor() {
     checkAccess();
   }, [user, systemRole, workspaceMembership, workspaceId, projectId]);
 
+  const PALETTE_TOP_OFFSET = 12;
+
+  useLayoutEffect(() => {
+    if (!paletteRef.current || !blocksContainerRef.current || !firstBlockRef.current) {
+      return;
+    }
+    const paletteRect = paletteRef.current.getBoundingClientRect();
+    const blocksRect = blocksContainerRef.current.getBoundingClientRect();
+    const firstRect = firstBlockRef.current.getBoundingClientRect();
+    const scrollY = window.scrollY;
+    const startTop = Math.max(firstRect.top + PALETTE_TOP_OFFSET, PALETTE_TOP_OFFSET);
+
+    paletteMetricsRef.current = {
+      startTop,
+      startTopDoc: firstRect.top + scrollY,
+      left: paletteRect.left,
+      width: paletteRect.width,
+      blocksTopDoc: blocksRect.top + scrollY,
+      blocksBottomDoc: blocksRect.bottom + scrollY
+    };
+
+    if (!usePaletteFallback) {
+      setPaletteStyle({
+        position: "sticky",
+        top: startTop
+      });
+    }
+  }, [blocks.length, paletteOpen, expandedPaletteBlock, usePaletteFallback]);
+
+  useEffect(() => {
+    function handleResize() {
+      if (!paletteRef.current || !blocksContainerRef.current || !firstBlockRef.current) {
+        return;
+      }
+      const paletteRect = paletteRef.current.getBoundingClientRect();
+      const blocksRect = blocksContainerRef.current.getBoundingClientRect();
+      const firstRect = firstBlockRef.current.getBoundingClientRect();
+      const scrollY = window.scrollY;
+      const startTop = Math.max(firstRect.top + PALETTE_TOP_OFFSET, PALETTE_TOP_OFFSET);
+
+      paletteMetricsRef.current = {
+        startTop,
+        startTopDoc: firstRect.top + scrollY,
+        left: paletteRect.left,
+        width: paletteRect.width,
+        blocksTopDoc: blocksRect.top + scrollY,
+        blocksBottomDoc: blocksRect.bottom + scrollY
+      };
+
+      if (!usePaletteFallback) {
+        setPaletteStyle({
+          position: "sticky",
+          top: startTop
+        });
+      }
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [usePaletteFallback]);
+
+  useEffect(() => {
+    function handleScroll() {
+      const metrics = paletteMetricsRef.current;
+      const paletteEl = paletteRef.current;
+      if (!metrics || !paletteEl) return;
+
+      if (!usePaletteFallback) {
+        if (window.scrollY > metrics.startTopDoc + 8) {
+          const rect = paletteEl.getBoundingClientRect();
+          if (Math.abs(rect.top - metrics.startTop) > 4) {
+            setUsePaletteFallback(true);
+          }
+        }
+        return;
+      }
+
+      const paletteHeight = paletteEl.offsetHeight;
+      const scrollY = window.scrollY;
+      const startTop = metrics.startTop;
+
+      let position: "absolute" | "fixed" = "absolute";
+      let top = metrics.startTopDoc - metrics.blocksTopDoc;
+
+      if (scrollY + startTop <= metrics.startTopDoc) {
+        position = "absolute";
+        top = metrics.startTopDoc - metrics.blocksTopDoc;
+      } else if (scrollY + startTop + paletteHeight >= metrics.blocksBottomDoc) {
+        position = "absolute";
+        top = Math.max(
+          metrics.blocksBottomDoc - metrics.blocksTopDoc - paletteHeight,
+          0
+        );
+      } else {
+        position = "fixed";
+        top = startTop;
+      }
+
+      setPaletteStyle({
+        position,
+        top,
+        left: position === "fixed" ? metrics.left : undefined,
+        width: position === "fixed" ? metrics.width : undefined
+      });
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [usePaletteFallback]);
+
   useEffect(() => {
     async function loadPage() {
       const page = await getPage(workspaceId, projectId, pageId);
       setPageTitle(page?.title || "Page");
+      setPageStatus(page?.status || "draft");
     }
     if (workspaceId && projectId && pageId) loadPage();
   }, [workspaceId, projectId, pageId]);
+
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setTitleDraft(pageTitle);
+    }
+  }, [pageTitle, isEditingTitle]);
 
   useEffect(() => {
     async function loadBlocks() {
@@ -890,6 +1094,11 @@ export default function PageEditor() {
     await updatePageTitle(workspaceId, projectId, pageId, nextTitle);
   }
 
+  async function handleUpdateStatus(nextStatus: PageStatus) {
+    setPageStatus(nextStatus);
+    await updatePageStatus(workspaceId, projectId, pageId, nextStatus);
+  }
+
   async function handleExport() {
     setStatusMessage("Exporting...");
     await exportPage(workspaceId, projectId, pageId);
@@ -919,37 +1128,250 @@ export default function PageEditor() {
     );
   }
 
+  const pageStatusOptions = [
+    { value: "not_started", label: "Not started" },
+    { value: "draft", label: "Draft" },
+    { value: "content_complete", label: "Content complete" },
+    { value: "ready_for_review", label: "Ready for review" },
+    { value: "internal_review", label: "Internal review" },
+    { value: "external_review", label: "External review" },
+    { value: "feedback_added", label: "Feedback added" },
+    { value: "approved", label: "Approved" },
+    { value: "ready_for_cms", label: "Ready for CMS" },
+    { value: "done", label: "Done" }
+  ];
+
+  const statusPhase =
+    pageStatus === "approved" || pageStatus === "ready_for_cms"
+      ? "approved"
+      : pageStatus === "done"
+        ? "completed"
+        : pageStatus === "ready_for_review" ||
+            pageStatus === "internal_review" ||
+            pageStatus === "external_review" ||
+            pageStatus === "feedback_added"
+          ? "review"
+          : "early";
+
   return (
     <AppShell>
       <div className="stack">
-        <div className="stack">
-          <Link
-            href={`/workspaces/${workspaceId}/projects/${projectId}`}
-            className="muted"
-          >
-            Back to project
-          </Link>
-          <h1>Page editor</h1>
-          <p className="muted">Edit structured blocks in page order.</p>
-        </div>
-
-        <section className="surface" style={{ padding: 20 }}>
-          <div className="stack">
-            <Input
-              label="Page title"
-              value={pageTitle}
-              onChange={handleUpdateTitle}
-            />
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <div className="muted" style={{ fontSize: 13 }}>
-                {statusMessage || "Changes are saved automatically."}
-              </div>
-              <Button variant="secondary" onClick={handleExport}>
-                Export page (CMS handover)
+        <div className="stack" style={{ gap: 10 }}>
+          <div className="stack" style={{ gap: 6 }}>
+            <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
+              <Link
+                href={`/workspaces/${workspaceId}/projects/${projectId}`}
+                className="row"
+                style={{
+                  gap: 8,
+                  border: "1px solid #e0e0e0",
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  color: "#4b4b4b",
+                  fontSize: 12,
+                  background: "#ffffff"
+                }}
+              >
+                <ArrowLeft />
+                <span>Back to Project</span>
+              </Link>
+              <span className="muted" style={{ fontSize: 12 }}>
+                Page Editor
+              </span>
+              <Button
+                variant="secondary"
+                onClick={handleExport}
+                style={{
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: "#4b4b4b",
+                  borderColor: "#e0e0e0",
+                  background: "#ffffff",
+                  fontSize: 12
+                }}
+              >
+                <span>Export Page</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    d="M12 4v10m0 0l4-4m-4 4l-4-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M4 20h16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </Button>
             </div>
+            <div className="stack" style={{ alignItems: "center", gap: 6 }}>
+              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                {isEditingTitle ? (
+                  <input
+                    value={titleDraft}
+                    onChange={(event) => setTitleDraft(event.target.value)}
+                    onBlur={() => {
+                      setIsEditingTitle(false);
+                      if (titleDraft.trim()) {
+                        handleUpdateTitle(titleDraft.trim());
+                      }
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        setIsEditingTitle(false);
+                        if (titleDraft.trim()) {
+                          handleUpdateTitle(titleDraft.trim());
+                        }
+                      }
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setIsEditingTitle(false);
+                        setTitleDraft(pageTitle);
+                      }
+                    }}
+                    style={{
+                      border: "1px solid #e0e0e0",
+                      borderRadius: 6,
+                      padding: "6px 10px",
+                      fontSize: 20,
+                      fontWeight: 600,
+                      color: "#1b1b1b",
+                      minWidth: 240,
+                      textAlign: "center"
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <>
+                    <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>
+                      {pageTitle}
+                    </h1>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingTitle(true)}
+                      style={{
+                        border: "1px solid #e0e0e0",
+                        background: "#ffffff",
+                        borderRadius: 999,
+                        padding: "4px 8px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                        color: "#4b4b4b"
+                      }}
+                      title="Edit page title"
+                      aria-label="Edit page title"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                        <path
+                          d="M4 17l4 3 12-12-4-3-12 12z"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M14 5l4 3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <span style={{ fontSize: 12 }}>Edit</span>
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="row" style={{ gap: 8, alignItems: "center" }}>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  Status:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsStatusMenuOpen((open) => !open)}
+                  className={`status-pill ${statusPhase}`}
+                  style={{ position: "relative" }}
+                  aria-label="Edit page status"
+                >
+                  <span>{pageStatusOptions.find((opt) => opt.value === pageStatus)?.label}</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M6 9l6 6 6-6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {isStatusMenuOpen && (
+                    <div
+                      className="surface status-menu"
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 6px)",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        minWidth: 200,
+                        padding: 8,
+                        zIndex: 10
+                      }}
+                    >
+                      <div className="stack" style={{ gap: 6 }}>
+                        {pageStatusOptions.map((option) => {
+                          const phase =
+                            option.value === "approved" || option.value === "ready_for_cms"
+                              ? "approved"
+                              : option.value === "done"
+                                ? "completed"
+                                : option.value === "ready_for_review" ||
+                                    option.value === "internal_review" ||
+                                    option.value === "external_review" ||
+                                    option.value === "feedback_added"
+                                  ? "review"
+                                  : "early";
+                          return (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => {
+                                setIsStatusMenuOpen(false);
+                                handleUpdateStatus(option.value as PageStatus);
+                              }}
+                              className={`status-pill ${phase}`}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
-        </section>
+          <div className="row" style={{ justifyContent: "flex-end" }}>
+            <div className="muted" style={{ fontSize: 13 }}>
+              {statusMessage || "Changes are saved automatically."}
+            </div>
+          </div>
+        </div>
 
         <section className="stack">
           <div className="row" style={{ justifyContent: "space-between" }}>
@@ -971,10 +1393,14 @@ export default function PageEditor() {
             className={`editor-layout ${
               expandedPaletteBlock ? "palette-expanded" : "palette-collapsed"
             }`}
+            ref={blocksContainerRef}
+            style={{ position: "relative" }}
           >
             <div className="editor-gutter">
               <BlockPalette
-                className={`palette ${paletteOpen ? "is-open" : ""}`}
+                className={paletteOpen ? "is-open" : ""}
+                style={paletteStyle}
+                ref={paletteRef}
                 expandedBlock={expandedPaletteBlock}
                 onExpand={setExpandedPaletteBlock}
                 onAdd={handleAddBlock}
@@ -987,26 +1413,30 @@ export default function PageEditor() {
                 </div>
               )}
               {blocks.map((block, index) => (
-                <BlockEditor
+                <div
                   key={block.id}
-                  block={block}
-                  index={index}
-                  total={blocks.length}
-              workspaceId={workspaceId}
-              projectId={projectId}
-              pageId={pageId}
-                isExpanded={expandedBlockIds.includes(block.id)}
-                onToggleExpanded={() =>
-                  setExpandedBlockIds((current) =>
-                    current.includes(block.id)
-                      ? current.filter((id) => id !== block.id)
-                      : [...current, block.id]
-                  )
-                }
-                  onMove={handleMoveBlock}
-                  onRemove={handleRemoveBlock}
-                  onUpdate={handleUpdateBlock}
-                />
+                  ref={index === 0 ? firstBlockRef : undefined}
+                >
+                  <BlockEditor
+                    block={block}
+                    index={index}
+                    total={blocks.length}
+                    workspaceId={workspaceId}
+                    projectId={projectId}
+                    pageId={pageId}
+                    isExpanded={expandedBlockIds.includes(block.id)}
+                    onToggleExpanded={() =>
+                      setExpandedBlockIds((current) =>
+                        current.includes(block.id)
+                          ? current.filter((id) => id !== block.id)
+                          : [...current, block.id]
+                      )
+                    }
+                    onMove={handleMoveBlock}
+                    onRemove={handleRemoveBlock}
+                    onUpdate={handleUpdateBlock}
+                  />
+                </div>
               ))}
             </div>
             <div className="editor-gutter" aria-hidden />
@@ -1237,7 +1667,9 @@ function BlockEditor({
               display: "grid",
               gridTemplateColumns: fullPreview
                 ? "minmax(0, 1fr)"
-                : "minmax(0, 1fr) 360px",
+                : showPreview
+                  ? "minmax(0, 35%) minmax(0, 65%)"
+                  : "minmax(0, 1fr)",
               gap: 16,
               alignItems: "start"
             }}
@@ -1348,6 +1780,16 @@ function BlockEditor({
                 onChange={(next) =>
                   updateField("media", { ...(fields as any).media, ...next })
                 }
+              />
+              <Select
+                label="Image display mode"
+                value={(fields as any).media?.displayMode || "landscape"}
+                onChange={(value) => updateField("media.displayMode", value)}
+                options={[
+                  { value: "landscape", label: "Landscape" },
+                  { value: "portrait", label: "Portrait" },
+                  { value: "square", label: "Square" }
+                ]}
               />
               <div className="row">
                 <Select
@@ -1489,6 +1931,43 @@ function BlockEditor({
                   updateField("media", { ...(fields as any).media, ...next })
                 }
               />
+              <Select
+                label="Image display mode"
+                value={(fields as any).media?.displayMode || "landscape"}
+                onChange={(value) => updateField("media.displayMode", value)}
+                options={[
+                  { value: "landscape", label: "Landscape" },
+                  { value: "portrait", label: "Portrait" },
+                  { value: "square", label: "Square" }
+                ]}
+              />
+              <div className="row">
+                <label className="stack" style={{ gap: 6, flex: "0 0 auto" }}>
+                  <span style={{ fontSize: "0.88em", color: "#4b4b4b" }}>
+                    Background colour
+                  </span>
+                  <input
+                    type="color"
+                    value={(fields as any).backgroundColor || "#ffffff"}
+                    onChange={(event) => updateField("backgroundColor", event.target.value)}
+                    style={{
+                      width: 42,
+                      height: 34,
+                      padding: 0,
+                      borderRadius: 6,
+                      border: "1px solid #d0d0d0",
+                      background: "transparent",
+                      cursor: "pointer"
+                    }}
+                  />
+                </label>
+                <Input
+                  label="Hex value"
+                  value={(fields as any).backgroundColor || ""}
+                  onChange={(value) => updateField("backgroundColor", value)}
+                  placeholder="#FFFFFF"
+                />
+              </div>
               <div className="row">
                 <Select
                   label="Text alignment"
@@ -1585,6 +2064,16 @@ function BlockEditor({
                 onChange={(next) =>
                   updateField("media", { ...(fields as any).media, ...next })
                 }
+              />
+              <Select
+                label="Image display mode"
+                value={(fields as any).media?.displayMode || "landscape"}
+                onChange={(value) => updateField("media.displayMode", value)}
+                options={[
+                  { value: "landscape", label: "Landscape" },
+                  { value: "portrait", label: "Portrait" },
+                  { value: "square", label: "Square" }
+                ]}
               />
               <Select
                 label="Image position"
@@ -1793,6 +2282,18 @@ function BlockEditor({
                                 updateField(`cards[${cardIndex}].eyebrow`, value)
                               }
                             />
+                            <Select
+                              label="Image display mode"
+                              value={card.displayMode || "landscape"}
+                              onChange={(value) =>
+                                updateField(`cards[${cardIndex}].displayMode`, value)
+                              }
+                              options={[
+                                { value: "landscape", label: "Landscape" },
+                                { value: "portrait", label: "Portrait" },
+                                { value: "square", label: "Square" }
+                              ]}
+                            />
                             <Input
                               label="Card image alt text"
                               value={card.imageAlt || ""}
@@ -1816,7 +2317,8 @@ function BlockEditor({
                     imageUrl: "",
                     imageAlt: "",
                     eyebrow: "",
-                    button: { label: "", url: "" }
+                    button: { label: "", url: "" },
+                    displayMode: "landscape"
                   })
                 }
               >
@@ -1991,6 +2493,18 @@ function BlockEditor({
                             }
                           />
                           <Select
+                            label="Image display mode"
+                            value={tab.media?.displayMode || "landscape"}
+                            onChange={(value) =>
+                              updateField(`tabs[${tabIndex}].media.displayMode`, value)
+                            }
+                            options={[
+                              { value: "landscape", label: "Landscape" },
+                              { value: "portrait", label: "Portrait" },
+                              { value: "square", label: "Square" }
+                            ]}
+                          />
+                          <Select
                             label="Image position"
                             value={tab.imagePosition || "right"}
                             onChange={(value) =>
@@ -2041,7 +2555,7 @@ function BlockEditor({
                     heading: { text: "", level: "h3" },
                     body: "",
                     button: { label: "", url: "" },
-                    media: { src: "", type: "image", alt: "" },
+                    media: { src: "", type: "image", alt: "", displayMode: "landscape" },
                     imagePosition: "right",
                     eyebrow: ""
                   })
@@ -2068,6 +2582,16 @@ function BlockEditor({
                 onChange={(next) =>
                   updateField("media", { ...(fields as any).media, ...next })
                 }
+              />
+              <Select
+                label="Image display mode"
+                value={(fields as any).media?.displayMode || "landscape"}
+                onChange={(value) => updateField("media.displayMode", value)}
+                options={[
+                  { value: "landscape", label: "Landscape" },
+                  { value: "portrait", label: "Portrait" },
+                  { value: "square", label: "Square" }
+                ]}
               />
               <MediaGalleryUpload
                 label="Gallery images"
@@ -2122,8 +2646,8 @@ function BlockEditor({
               style={{
                 position: "sticky",
                 top: 16,
-                width: fullPreview ? "100%" : 360,
-                minWidth: fullPreview ? "100%" : 360
+                width: "100%",
+                minWidth: 0
               }}
             >
               <div className="surface" style={{ padding: 16 }}>
@@ -2132,7 +2656,11 @@ function BlockEditor({
                     <strong>Preview</strong>
                     <div className="divider" />
                   </div>
-                  <BlockPreview blockType={block.type} fields={fields} />
+                  <BlockPreview
+                    blockType={block.type}
+                    fields={fields}
+                    previewMode={fullPreview ? "full" : "side"}
+                  />
                 </div>
               </div>
             </div>
@@ -2146,12 +2674,19 @@ function BlockEditor({
 
 function BlockPreview({
   blockType,
-  fields
+  fields,
+  previewMode = "side"
 }: {
   blockType: BlockType;
   fields: BlockFields;
+  previewMode?: "side" | "full";
 }) {
   const data: any = fields;
+  const isSidePreview = previewMode === "side";
+  const bodyScale = isSidePreview ? 0.9 : 1;
+  const headingScale = isSidePreview ? 0.95 : 1;
+  const bodyFont = (size: number) => size * bodyScale;
+  const headingFont = (size: number) => size * headingScale;
   const [activeTabIndex, setActiveTabIndex] = useState(0);
   useEffect(() => {
     if (blockType !== "tab_content") return;
@@ -2163,6 +2698,7 @@ function BlockPreview({
     const textColor = data.textColor === "white" ? "#ffffff" : "#111111";
     const buttonJustify =
       textAlign === "left" ? "flex-start" : textAlign === "center" ? "center" : "flex-end";
+    const heroRatio = previewRatioNumber(data.media?.displayMode, PREVIEW_IMAGE_ASPECT);
     return (
       <div
         style={{
@@ -2175,11 +2711,11 @@ function BlockPreview({
         <div
           style={{
             position: "relative",
-            padding: 16,
+            padding: 20,
             background: data.media?.src ? "#d9e1ea" : "#f2f2f2",
             display: "flex",
             alignItems: "center",
-            aspectRatio: aspectRatioValue(PREVIEW_IMAGE_ASPECT),
+            aspectRatio: heroRatio,
             overflow: "hidden"
           }}
         >
@@ -2192,7 +2728,7 @@ function BlockPreview({
                 inset: 0,
                 width: "100%",
                 height: "100%",
-                objectFit: "cover",
+                objectFit: "contain",
                 opacity: 0.6
               }}
             />
@@ -2213,13 +2749,15 @@ function BlockPreview({
               zIndex: 1,
               color: textColor,
               width: "100%",
-              textAlign
+              textAlign,
+              maxWidth: PREVIEW_TEXT_MAX,
+              margin: textAlign === "center" ? "0 auto" : undefined
             }}
           >
-            <div style={{ fontSize: 18, fontWeight: 600 }}>
+            <div style={{ fontSize: headingFont(19), fontWeight: 600 }}>
               {data.heading?.text || "Hero heading"}
             </div>
-            <div style={{ marginTop: 6, fontSize: 13 }}>
+            <div style={{ marginTop: 8, fontSize: bodyFont(13) }}>
               {data.body || "Hero body text"}
             </div>
             <div
@@ -2229,7 +2767,12 @@ function BlockPreview({
               {data.primaryButton?.label && (
                 <span
                   className="tag"
-                  style={{ color: textColor, borderColor: textColor, background: "transparent" }}
+                  style={{
+                    color: textColor,
+                    borderColor: textColor,
+                    background: "transparent",
+                    fontSize: bodyFont(12)
+                  }}
                 >
                   {data.primaryButton.label}
                 </span>
@@ -2237,7 +2780,12 @@ function BlockPreview({
               {data.secondaryButton?.label && (
                 <span
                   className="tag"
-                  style={{ color: textColor, borderColor: textColor, background: "transparent" }}
+                  style={{
+                    color: textColor,
+                    borderColor: textColor,
+                    background: "transparent",
+                    fontSize: bodyFont(12)
+                  }}
                 >
                   {data.secondaryButton.label}
                 </span>
@@ -2252,13 +2800,17 @@ function BlockPreview({
     const cards = Array.isArray(data.cards) ? data.cards : [];
     const allowScroll = cards.length > 3;
     return (
-      <div className="stack">
-        <strong>{data.heading?.text || "Card list heading"}</strong>
-        <p className="muted">{data.description || "List description"}</p>
+      <div className="stack" style={{ gap: PREVIEW_GAP }}>
+        <strong style={{ fontSize: headingFont(14) }}>
+          {data.heading?.text || "Card list heading"}
+        </strong>
+        <p className="muted" style={{ fontSize: bodyFont(12) }}>
+          {data.description || "List description"}
+        </p>
         <div
           style={{
             display: "flex",
-            gap: 8,
+            gap: PREVIEW_GAP,
             overflowX: allowScroll ? "auto" : "visible",
             paddingBottom: allowScroll ? 4 : 0
           }}
@@ -2269,9 +2821,9 @@ function BlockPreview({
               style={{
                 border: "1px solid #e3e3e3",
                 borderRadius: 6,
-                padding: 8,
+                padding: 10,
                 background: "#ffffff",
-                minWidth: 160,
+                minWidth: PREVIEW_CARD_MIN,
                 flex: "0 0 auto"
               }}
             >
@@ -2280,22 +2832,33 @@ function BlockPreview({
                   src={card.imageUrl}
                   alt={card.imageAlt}
                   aspectRatio={data.imageAspectRatio || PREVIEW_IMAGE_ASPECT}
+                  displayMode={card.displayMode}
+                  allowFlex={isSidePreview}
                 />
                 {hasText(card.eyebrow) && (
-                  <span style={{ fontSize: 10, color: "#7a7a7a", letterSpacing: 0.6, textTransform: "uppercase" }}>
+                  <span
+                    style={{
+                      fontSize: bodyFont(10),
+                      color: "#7a7a7a",
+                      letterSpacing: 0.6,
+                      textTransform: "uppercase"
+                    }}
+                  >
                     {card.eyebrow}
                   </span>
                 )}
               </div>
-              <div style={{ fontSize: 12, fontWeight: 600 }}>
+              <div style={{ fontSize: headingFont(12), fontWeight: 600 }}>
                 {card.heading || "Card title"}
               </div>
-              <div style={{ fontSize: 11, color: "#5c5c5c", marginTop: 4 }}>
+              <div style={{ fontSize: bodyFont(11), color: "#5c5c5c", marginTop: 4 }}>
                 {card.description || "Card description"}
               </div>
               {card.button?.label && (
                 <div className="row" style={{ gap: 6, marginTop: 6 }}>
-                  <span className="tag">{card.button.label}</span>
+                  <span className="tag" style={{ fontSize: bodyFont(12) }}>
+                    {card.button.label}
+                  </span>
                 </div>
               )}
             </div>
@@ -2308,9 +2871,13 @@ function BlockPreview({
     const tabs = Array.isArray(data.tabs) ? data.tabs : [];
     const activeTab = tabs[activeTabIndex] || tabs[0];
     return (
-      <div className="stack">
-        <strong>{data.mainHeading?.text || "Tabs heading"}</strong>
-        <p className="muted">{data.mainDescription || "Tabs description"}</p>
+      <div className="stack" style={{ gap: PREVIEW_GAP, maxWidth: PREVIEW_TEXT_MAX }}>
+        <strong style={{ fontSize: headingFont(14) }}>
+          {data.mainHeading?.text || "Tabs heading"}
+        </strong>
+        <p className="muted" style={{ fontSize: bodyFont(12) }}>
+          {data.mainDescription || "Tabs description"}
+        </p>
         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
           {tabs.map((tab: any, idx: number) => (
             <button
@@ -2324,7 +2891,7 @@ function BlockPreview({
                 background: idx === activeTabIndex ? "#1b1b1b" : "#ffffff",
                 color: idx === activeTabIndex ? "#ffffff" : "#1b1b1b",
                 cursor: "pointer",
-                fontSize: 11
+                fontSize: bodyFont(11)
               }}
             >
               {tab.name || `Tab ${idx + 1}`}
@@ -2333,10 +2900,10 @@ function BlockPreview({
         </div>
         {activeTab && (
           <div className="stack" style={{ gap: 6 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>
+            <div style={{ fontSize: headingFont(13), fontWeight: 600 }}>
               {activeTab.heading?.text || "Tab heading"}
             </div>
-            <div style={{ fontSize: 12, color: "#5c5c5c" }}>
+            <div style={{ fontSize: bodyFont(12), color: "#5c5c5c" }}>
               {activeTab.body || "Tab body"}
             </div>
           </div>
@@ -2350,9 +2917,18 @@ function BlockPreview({
     const buttonJustify =
       textAlign === "left" ? "flex-start" : textAlign === "center" ? "center" : "flex-end";
     const hasMedia = Boolean(data.media?.src);
+    const hasBg = Boolean(data.backgroundColor);
+    const bannerBg = hasBg ? data.backgroundColor : data.media?.src ? "#f2f2f2" : "#fafafa";
+    const imageWeight = PREVIEW_SIDE_IMAGE + 40;
     const imageBlock = hasMedia ? (
-      <div style={{ width: 120 }}>
-        <PreviewImageFrame src={data.media.src} alt={data.media?.alt} />
+      <div style={{ width: imageWeight }}>
+        <PreviewImageFrame
+          src={data.media.src}
+          alt={data.media?.alt}
+          displayMode={data.media?.displayMode}
+          backgroundColor={bannerBg}
+          allowFlex={isSidePreview}
+        />
       </div>
     ) : null;
     return (
@@ -2360,34 +2936,44 @@ function BlockPreview({
         style={{
           border: "1px solid #e3e3e3",
           borderRadius: 8,
-          padding: 12,
-          background: data.media?.src ? "#f2f2f2" : "#fafafa"
+          padding: 16,
+          background: bannerBg
         }}
       >
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: hasMedia ? "1fr 96px" : "1fr",
-            gap: 12,
+            gridTemplateColumns: hasMedia ? "minmax(0, 0.9fr) minmax(0, 1.2fr)" : "1fr",
+            gap: PREVIEW_GAP + 2,
             alignItems: "center"
           }}
         >
           {data.mediaAlignment === "left" && imageBlock}
-          <div style={{ textAlign, color: textColor }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>
+          <div style={{ textAlign, color: textColor, maxWidth: PREVIEW_TEXT_MAX }}>
+            <div style={{ fontSize: headingFont(15), fontWeight: 600 }}>
               {data.heading?.text || "Banner heading"}
             </div>
-            <div style={{ fontSize: 12, marginTop: 6 }}>
+            <div style={{ fontSize: bodyFont(12), marginTop: 8 }}>
               {data.body || "Banner body"}
             </div>
             <div
               className="row"
-              style={{ gap: 6, marginTop: 8, justifyContent: buttonJustify, flexWrap: "wrap" }}
+              style={{
+                gap: 6,
+                marginTop: 10,
+                justifyContent: buttonJustify,
+                flexWrap: "wrap"
+              }}
             >
               {data.primaryButton?.label && (
                 <span
                   className="tag"
-                  style={{ color: textColor, borderColor: textColor, background: "transparent" }}
+                  style={{
+                    color: textColor,
+                    borderColor: textColor,
+                    background: "transparent",
+                    fontSize: bodyFont(12)
+                  }}
                 >
                   {data.primaryButton.label}
                 </span>
@@ -2395,7 +2981,12 @@ function BlockPreview({
               {data.secondaryButton?.label && (
                 <span
                   className="tag"
-                  style={{ color: textColor, borderColor: textColor, background: "transparent" }}
+                  style={{
+                    color: textColor,
+                    borderColor: textColor,
+                    background: "transparent",
+                    fontSize: bodyFont(12)
+                  }}
                 >
                   {data.secondaryButton.label}
                 </span>
@@ -2409,24 +3000,42 @@ function BlockPreview({
   }
   if (blockType === "content") {
     const contentGroup = (
-      <div className="stack" style={{ gap: 6 }}>
+      <div className="stack" style={{ gap: 6, maxWidth: PREVIEW_TEXT_MAX }}>
         {hasText(data.eyebrow) && (
-          <span style={{ fontSize: 11, color: "#7a7a7a", letterSpacing: 0.6, textTransform: "uppercase" }}>
+          <span
+            style={{
+              fontSize: bodyFont(11),
+              color: "#7a7a7a",
+              letterSpacing: 0.6,
+              textTransform: "uppercase"
+            }}
+          >
             {data.eyebrow}
           </span>
         )}
-        <strong>{data.heading?.text || "Content heading"}</strong>
-        <p className="muted">{data.body || "Content body"}</p>
+        <strong style={{ fontSize: headingFont(14) }}>
+          {data.heading?.text || "Content heading"}
+        </strong>
+        <p className="muted" style={{ fontSize: bodyFont(12) }}>
+          {data.body || "Content body"}
+        </p>
         {data.primaryButton?.label && (
           <div className="row" style={{ gap: 6 }}>
-            <span className="tag">{data.primaryButton.label}</span>
+            <span className="tag" style={{ fontSize: bodyFont(12) }}>
+              {data.primaryButton.label}
+            </span>
           </div>
         )}
       </div>
     );
     const imageBlock = (
       <div className="stack" style={{ gap: 6 }}>
-        <PreviewImageFrame src={data.media?.src} alt={data.media?.alt} />
+        <PreviewImageFrame
+          src={data.media?.src}
+          alt={data.media?.alt}
+          displayMode={data.media?.displayMode}
+          allowFlex={isSidePreview}
+        />
         {hasText(data.media?.caption) && (
           <span className="muted" style={{ fontSize: 11 }}>
             {data.media.caption}
@@ -2440,8 +3049,8 @@ function BlockPreview({
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
+              gridTemplateColumns: "minmax(0, 1.25fr) minmax(0, 0.9fr)",
+              gap: PREVIEW_GAP,
               alignItems: "center"
             }}
           >
@@ -2461,12 +3070,15 @@ function BlockPreview({
   if (blockType === "media") {
     const gallery = Array.isArray(data.gallery) ? data.gallery : [];
     const showGallery = gallery.length > 0;
-    const ratio = data.media?.aspectRatio || PREVIEW_IMAGE_ASPECT;
+    const ratio = previewRatioNumber(
+      data.media?.displayMode,
+      data.media?.aspectRatio || PREVIEW_IMAGE_ASPECT
+    );
     return (
-      <div className="stack" style={{ gap: 8 }}>
+      <div className="stack" style={{ gap: PREVIEW_GAP, maxWidth: PREVIEW_TEXT_MAX }}>
         {showGallery ? (
           <div className="stack" style={{ gap: 6 }}>
-            <span className="muted" style={{ fontSize: 12 }}>
+            <span className="muted" style={{ fontSize: bodyFont(12) }}>
               Gallery preview
             </span>
             <div
@@ -2487,7 +3099,13 @@ function BlockPreview({
                     justifyContent: "center"
                   }}
                 >
-                  <PreviewImageFrame src={item?.src} alt={item?.alt} aspectRatio={ratio} />
+                  <PreviewImageFrame
+                    src={item?.src}
+                    alt={item?.alt}
+                    aspectRatio={data.media?.aspectRatio || PREVIEW_IMAGE_ASPECT}
+                    displayMode={item?.displayMode || data.media?.displayMode}
+                    allowFlex={isSidePreview}
+                  />
                 </div>
               ))}
             </div>
@@ -2499,7 +3117,7 @@ function BlockPreview({
                 style={{
                   position: "relative",
                   width: "100%",
-                  aspectRatio: aspectRatioValue(ratio),
+                  aspectRatio: ratio,
                   overflow: "hidden",
                   background: "#efefef"
                 }}
@@ -2517,12 +3135,18 @@ function BlockPreview({
                 )}
               </div>
             ) : (
-              <PreviewImageFrame src={data.media?.src} alt={data.media?.alt} aspectRatio={ratio} />
+              <PreviewImageFrame
+                src={data.media?.src}
+                alt={data.media?.alt}
+                aspectRatio={data.media?.aspectRatio || PREVIEW_IMAGE_ASPECT}
+                displayMode={data.media?.displayMode}
+                allowFlex={isSidePreview}
+              />
             )}
           </div>
         )}
         {hasText(data.media?.caption) && (
-          <span className="muted" style={{ fontSize: 12 }}>
+          <span className="muted" style={{ fontSize: bodyFont(12) }}>
             {data.media.caption}
           </span>
         )}
@@ -2538,5 +3162,20 @@ function BlockPreview({
         background: data.media?.src ? "#d9e1ea" : "#f2f2f2"
       }}
     />
+  );
+}
+
+function ArrowLeft() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M15 6l-6 6 6 6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

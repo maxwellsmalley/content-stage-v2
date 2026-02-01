@@ -10,7 +10,8 @@ export function Button({
   variant = "secondary",
   type = "button",
   disabled,
-  className
+  className,
+  style
 }: {
   children: React.ReactNode;
   onClick?: () => void;
@@ -18,6 +19,7 @@ export function Button({
   type?: "button" | "submit";
   disabled?: boolean;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   return (
     <button
@@ -35,7 +37,8 @@ export function Button({
         cursor: "pointer",
         ...(variant === "danger"
           ? { color: "#a10d0d", borderColor: "#a10d0d" }
-          : {})
+          : {}),
+        ...(style || {})
       }}
     >
       {children}
@@ -58,7 +61,7 @@ export function Input({
 }) {
   return (
     <label className="stack" style={{ gap: 6 }}>
-      <span style={{ fontSize: 13, color: "#4b4b4b" }}>{label}</span>
+      <span style={{ fontSize: "0.88em", color: "#4b4b4b" }}>{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -91,7 +94,7 @@ export function Textarea({
 }) {
   return (
     <label className="stack" style={{ gap: 6 }}>
-      <span style={{ fontSize: 13, color: "#4b4b4b" }}>{label}</span>
+      <span style={{ fontSize: "0.88em", color: "#4b4b4b" }}>{label}</span>
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -122,7 +125,7 @@ export function Select({
 }) {
   return (
     <label className="stack" style={{ gap: 6 }}>
-      <span style={{ fontSize: 13, color: "#4b4b4b" }}>{label}</span>
+      <span style={{ fontSize: "0.88em", color: "#4b4b4b" }}>{label}</span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}

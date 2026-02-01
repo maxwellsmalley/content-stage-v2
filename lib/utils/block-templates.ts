@@ -25,7 +25,7 @@ export function createDefaultFields(type: BlockType) {
         body: "",
         primaryButton: { label: "", url: "" },
         secondaryButton: { label: "", url: "" },
-        media: { src: "", type: "image", alt: "" },
+        media: { src: "", type: "image", alt: "", displayMode: "landscape" },
         textAlignment: "left",
         mediaAlignment: "right",
         behindMediaOverlay: false,
@@ -38,7 +38,7 @@ export function createDefaultFields(type: BlockType) {
         body: "",
         primaryButton: { label: "", url: "" },
         secondaryButton: { label: "", url: "" },
-        media: { src: "", type: "image", alt: "" },
+        media: { src: "", type: "image", alt: "", displayMode: "landscape" },
         textAlignment: "left",
         mediaAlignment: "right",
         backgroundMode: "background",
@@ -54,7 +54,7 @@ export function createDefaultFields(type: BlockType) {
         body: "",
         primaryButton: { label: "", url: "" },
         secondaryButton: { label: "", url: "" },
-        media: { src: "", type: "image", alt: "", caption: "" },
+        media: { src: "", type: "image", alt: "", caption: "", displayMode: "landscape" },
         imagePosition: "right",
         eyebrow: "",
         variant: ""
@@ -84,7 +84,8 @@ export function createDefaultFields(type: BlockType) {
           alt: "",
           caption: "",
           aspectRatio: "16:9",
-          fullWidth: false
+          fullWidth: false,
+          displayMode: "landscape"
         },
         gallery: []
       } satisfies MediaFields;

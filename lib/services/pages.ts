@@ -25,7 +25,8 @@ export async function createPage(
       title,
       status: "draft",
       order: Date.now(),
-      createdAt: Timestamp.now()
+      createdAt: Timestamp.now(),
+      statusUpdatedAt: Timestamp.now()
     }
   );
   return pageRef.id;
@@ -54,7 +55,10 @@ export async function getPage(
     title: String(data.title || ""),
     status: data.status as PageStatus,
     order: Number(data.order || 0),
-    folderId: data.folderId || null
+    folderId: data.folderId || null,
+    statusUpdatedAt: data.statusUpdatedAt?.toDate
+      ? data.statusUpdatedAt.toDate().toISOString()
+      : undefined
   };
 }
 
@@ -75,7 +79,10 @@ export async function listPages(
       title: String(data.title || ""),
       status: data.status as PageStatus,
       order: Number(data.order || 0),
-      folderId: data.folderId || null
+      folderId: data.folderId || null,
+      statusUpdatedAt: data.statusUpdatedAt?.toDate
+        ? data.statusUpdatedAt.toDate().toISOString()
+        : undefined
     };
   });
 }
@@ -88,7 +95,7 @@ export async function updatePageStatus(
 ) {
   await updateDoc(
     doc(db, "workspaces", workspaceId, "projects", projectId, "pages", pageId),
-    { status }
+    { status, statusUpdatedAt: Timestamp.now() }
   );
 }
 

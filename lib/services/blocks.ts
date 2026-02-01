@@ -17,7 +17,8 @@ function sanitizeMedia(media: any) {
   return {
     src: String(media.src || ""),
     alt: String(media.alt || ""),
-    caption: String(media.caption || "")
+    caption: String(media.caption || ""),
+    displayMode: media.displayMode ? String(media.displayMode) : undefined
   };
 }
 

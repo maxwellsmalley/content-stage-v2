@@ -1,7 +1,8 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
 import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
 import JSZip from "jszip";
-import { db } from "@/lib/firebase";
+import { db, storage } from "@/lib/firebase";
+import { getBlob, ref } from "firebase/storage";
 import { downloadBlob, downloadJson } from "../utils/export";
 
 export async function exportProject(
@@ -415,15 +416,18 @@ export async function exportPage(
     const zip = new JSZip();
     const assetsFolder = zip.folder(`content-stage-page-${slug || pageSnapshot.id}-assets`);
     if (assetsFolder) {
-      await Promise.all(
+      const results = await Promise.allSettled(
         Array.from(assetIndex.values()).map(async (asset) => {
-          const response = await fetch(asset.url);
-          const blob = await response.blob();
+          const fileRef = ref(storage, asset.url);
+          const blob = await getBlob(fileRef);
           assetsFolder.file(asset.filename, blob);
         })
       );
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      downloadBlob(`content-stage-page-${slug || pageSnapshot.id}-assets.zip`, zipBlob);
+      const hasFiles = results.some((result) => result.status === "fulfilled");
+      if (hasFiles) {
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        downloadBlob(`content-stage-page-${slug || pageSnapshot.id}-assets.zip`, zipBlob);
+      }
     }
   }
 }

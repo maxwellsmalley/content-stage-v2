@@ -1,6 +1,16 @@
 export type Role = "super_admin" | "admin" | "user";
 
-export type PageStatus = "draft" | "in_review" | "approved";
+export type PageStatus =
+  | "not_started"
+  | "draft"
+  | "content_complete"
+  | "ready_for_review"
+  | "internal_review"
+  | "external_review"
+  | "feedback_added"
+  | "approved"
+  | "ready_for_cms"
+  | "done";
 
 export type BlockType =
   | "hero"
@@ -30,6 +40,7 @@ export type MediaField = {
   aspectRatio?: "16:9" | "4:3" | "1:1" | "3:4";
   fullWidth?: boolean;
   fileName?: string;
+  displayMode?: "landscape" | "portrait" | "square";
 };
 
 export type HeroFields = {
@@ -83,6 +94,7 @@ export type CardListFields = {
     imageAlt: string;
     eyebrow: string;
     button: ButtonField;
+    displayMode?: "landscape" | "portrait" | "square";
   }>;
   displayMode: "grid" | "carousel";
   columns: 2 | 3 | 4;
@@ -109,13 +121,16 @@ export type MediaFields = {
   gallery?: MediaField[];
 };
 
-export type BlockFields =
+export type BlockFields = (
   | HeroFields
   | BannerFields
   | ContentFields
   | CardListFields
   | TabContentFields
-  | MediaFields;
+  | MediaFields
+) & {
+  blockLabel?: string;
+};
 
 export type Block = {
   id: string;
@@ -130,6 +145,7 @@ export type Page = {
   status: PageStatus;
   order: number;
   folderId?: string | null;
+  statusUpdatedAt?: string;
 };
 
 export type Folder = {

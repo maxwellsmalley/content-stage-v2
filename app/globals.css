@@ -81,9 +81,14 @@ main {
   width: 100%;
 }
 
+.blocks-editor {
+  position: relative;
+}
+
 .palette {
   position: sticky;
-  top: 120px;
+  top: 0;
+  z-index: 30;
 }
 
 .palette-toggle {
@@ -93,6 +98,20 @@ main {
 .edit-panel .row {
   flex-wrap: wrap;
   align-items: flex-start;
+}
+
+.edit-panel .stack {
+  gap: 12px;
+}
+
+.edit-panel input,
+.edit-panel textarea,
+.edit-panel select {
+  font-size: 0.88em;
+}
+
+.edit-panel strong {
+  font-size: 0.9em;
 }
 
 .edit-panel .row > * {
@@ -214,14 +233,67 @@ main {
   color: #4b4b4b;
 }
 
-.tag.status-in-review {
-  background: #eef3f8;
-  color: #2f4b63;
+.tag.status-not-started,
+.tag.status-draft,
+.tag.status-content-complete {
+  background: #edf1f4;
+  color: #3f4750;
 }
 
-.tag.status-approved {
-  background: #edf6f0;
+.tag.status-ready-for-review,
+.tag.status-internal-review,
+.tag.status-external-review,
+.tag.status-feedback-added {
+  background: #f8efe1;
+  color: #7a5a2e;
+}
+
+.tag.status-approved,
+.tag.status-ready-for-cms {
+  background: #e7f4ea;
   color: #2f5b3c;
+}
+
+.tag.status-done {
+  background: #ede9f6;
+  color: #5b4a7a;
+}
+
+.status-pill {
+  border: 1px solid #e0e0e0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #4b4b4b;
+  background: #ffffff;
+}
+
+.status-pill.early {
+  background: #edf1f4;
+  color: #3f4750;
+  border-color: #dfe5eb;
+}
+
+.status-pill.review {
+  background: #f8efe1;
+  color: #7a5a2e;
+  border-color: #f0e2cc;
+}
+
+.status-pill.approved {
+  background: #e7f4ea;
+  color: #2f5b3c;
+  border-color: #d7eadc;
+}
+
+.status-pill.completed {
+  background: #ede9f6;
+  color: #5b4a7a;
+  border-color: #e1d9f0;
+}
+
+.status-menu button:hover {
+  filter: brightness(0.97);
 }
 
 .row-item {

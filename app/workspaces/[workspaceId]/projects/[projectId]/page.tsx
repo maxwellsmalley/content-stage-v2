@@ -34,6 +34,7 @@ export default function ProjectOverviewPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [newPageTitle, setNewPageTitle] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [activeRenamePageId, setActiveRenamePageId] = useState<string | null>(
     null
   );
@@ -203,13 +204,19 @@ export default function ProjectOverviewPage() {
 
   const folderCount = folders.length;
   const pageCount = pages.length;
-  const statusCounts = pages.reduce(
-    (acc, page) => {
-      acc[page.status] += 1;
-      return acc;
-    },
-    { draft: 0, in_review: 0, approved: 0 } as Record<PageStatus, number>
-  );
+  const pageStatusOptions = [
+    { value: "all", label: "All statuses" },
+    { value: "not_started", label: "Not started" },
+    { value: "draft", label: "Draft" },
+    { value: "content_complete", label: "Content complete" },
+    { value: "ready_for_review", label: "Ready for review" },
+    { value: "internal_review", label: "Internal review" },
+    { value: "external_review", label: "External review" },
+    { value: "feedback_added", label: "Feedback added" },
+    { value: "approved", label: "Approved" },
+    { value: "ready_for_cms", label: "Ready for CMS" },
+    { value: "done", label: "Done" }
+  ];
 
   const foldersByParent = folders.reduce<Record<string, Folder[]>>(
     (acc, folder) => {
@@ -229,7 +236,9 @@ export default function ProjectOverviewPage() {
   }, {});
 
   function renderPages(items: Page[], indent: number, folderId?: string | null) {
-    return items.map((page) => (
+    return items
+      .filter((page) => statusFilter === "all" || page.status === statusFilter)
+      .map((page) => (
       <div
         key={page.id}
         className="row-item"
@@ -271,8 +280,8 @@ export default function ProjectOverviewPage() {
               {page.title}
             </Link>
           )}
-          <span className={`tag status-${page.status}`}>
-            {page.status.replace("_", " ")}
+          <span className={`status-pill ${statusPhase(page.status)}`}>
+            {formatStatus(page.status)}
           </span>
         </div>
         <div className="row-actions">
@@ -292,7 +301,7 @@ export default function ProjectOverviewPage() {
           />
         </div>
       </div>
-    ));
+      ));
   }
 
   function renderFolder(folder: Folder, indent: number) {
@@ -396,15 +405,34 @@ export default function ProjectOverviewPage() {
     );
   }
 
+  function formatStatus(status: PageStatus) {
+    return status
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  function statusPhase(status: PageStatus) {
+    if (status === "approved" || status === "ready_for_cms") return "approved";
+    if (status === "done") return "completed";
+    if (
+      status === "ready_for_review" ||
+      status === "internal_review" ||
+      status === "external_review" ||
+      status === "feedback_added"
+    ) {
+      return "review";
+    }
+    return "early";
+  }
+
   return (
     <AppShell>
-      <div className="stack" style={{ gap: 12 }}>
-        <div className="stack" style={{ gap: 6 }}>
-          <h1>{projectName}</h1>
-          <p className="muted">
-            This project includes {pageCount} pages across {folderCount} folders.
-            {` `}Draft {statusCounts.draft}, in review {statusCounts.in_review},
-            approved {statusCounts.approved}.
+      <div className="stack" style={{ gap: 10 }}>
+        <div className="stack" style={{ gap: 0, alignItems: "center" }}>
+          <h1 style={{ textAlign: "center" }}>{projectName}</h1>
+          <p className="muted" style={{ fontSize: 12, marginTop: -6 }}>
+            {pageCount} pages · {folderCount} folders
           </p>
         </div>
         <div className="header-divider" />
@@ -413,9 +441,6 @@ export default function ProjectOverviewPage() {
           <div className="stack">
             <div className="row" style={{ justifyContent: "space-between" }}>
               <h2>Contents</h2>
-              <Button variant="secondary" onClick={handleExportProject}>
-                Export project
-              </Button>
             </div>
             {loadingPages && <p className="muted">Loading pages...</p>}
             <div className="stack">
@@ -423,15 +448,103 @@ export default function ProjectOverviewPage() {
                 <Button
                   variant="secondary"
                   onClick={() => setShowAddPage((prev) => !prev)}
+                  style={{
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#4b4b4b",
+                    borderColor: "#e0e0e0",
+                    background: "#ffffff",
+                    fontSize: 12
+                  }}
                 >
-                  Add new page
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M6 4h8l4 4v12H6z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M14 4v4h4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>Add New Page</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M12 5v14M5 12h14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </Button>
                 <Button
                   variant="secondary"
                   onClick={() => setShowAddFolder((prev) => !prev)}
+                  style={{
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#4b4b4b",
+                    borderColor: "#e0e0e0",
+                    background: "#ffffff",
+                    fontSize: 12
+                  }}
                 >
-                  Add folder
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M3 7h7l2 2h9v8H3z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  <span>Add New Folder</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M12 5v14M5 12h14"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 </Button>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  style={{
+                    padding: "6px 10px",
+                    borderRadius: 999,
+                    border: "1px solid #e0e0e0",
+                    background: "#ffffff",
+                    color: "#4b4b4b",
+                    fontSize: 12
+                  }}
+                >
+                  {pageStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               {showAddPage && (
                 <div className="row row-indent" style={{ alignItems: "flex-end" }}>

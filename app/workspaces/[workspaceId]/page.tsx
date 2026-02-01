@@ -134,8 +134,29 @@ export default function WorkspacePage() {
               <Button
                 variant="secondary"
                 onClick={() => setShowAddProject((prev) => !prev)}
+                style={{
+                  borderRadius: 999,
+                  padding: "6px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: "#4b4b4b",
+                  borderColor: "#e0e0e0",
+                  background: "#ffffff",
+                  fontSize: 12
+                }}
               >
-                Add project
+                <span>Add Project</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                  <path
+                    d="M12 5v14M5 12h14"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </Button>
             )}
           </div>
