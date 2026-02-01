@@ -1594,12 +1594,26 @@ function BlockEditor({
               onClick={onToggleExpanded}
               icon={isExpanded ? "chevron-down" : "chevron-right"}
             />
-            <div className="stack" style={{ gap: 2 }}>
-              <strong>{blockTypeLabels[block.type]}</strong>
-              <span className="muted" style={{ fontSize: 12 }}>
-                Position {index + 1} of {total}
-              </span>
-            </div>
+            <input
+              value={(fields as any).blockLabel || ""}
+              onChange={(event) => updateField("blockLabel", event.target.value)}
+              placeholder="Add block label"
+              aria-label="Block label"
+              style={{
+                border: "none",
+                background: "transparent",
+                padding: 0,
+                margin: 0,
+                minWidth: 120,
+                flex: "1 1 240px",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#1b1b1b"
+              }}
+            />
+            <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>
+              {blockTypeLabels[block.type]}
+            </span>
           </div>
           <div className="row" style={{ gap: 6 }}>
             <IconButton
