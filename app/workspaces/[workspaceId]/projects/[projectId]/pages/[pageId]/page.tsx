@@ -404,7 +404,12 @@ function MediaGalleryUpload({
                 setError(`You can add up to ${maxItems} images.`);
                 return;
               }
-              const uploads: Array<{ src: string; type?: "image" | "video"; fileName?: string }> = [];
+              const uploads: Array<{
+                src: string;
+                type?: "image" | "video";
+                fileName?: string;
+                displayMode?: "landscape" | "portrait" | "square";
+              }> = [];
               for (const file of files) {
                 if (!file.type.startsWith("image")) {
                   setError("Only images are supported for galleries.");
