@@ -1,8 +1,15 @@
 import { collection, doc, getDoc, getDocs, orderBy, query } from "firebase/firestore";
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
-import JSZip from "jszip";
-import { db, storage } from "@/lib/firebase";
-import { getBlob, ref } from "firebase/storage";
+import {
+  Document as PdfDocument,
+  Page as PdfPage,
+  StyleSheet,
+  Text,
+  View,
+  pdf
+} from "@react-pdf/renderer";
+import { createElement } from "react";
+import { db, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import { downloadBlob, downloadJson } from "../utils/export";
 
 export async function exportProject(
@@ -69,6 +76,48 @@ export async function exportProject(
   );
 }
 
+const pdfStyles = StyleSheet.create({
+  page: {
+    padding: 32,
+    fontSize: 11,
+    color: "#1b1b1b",
+    lineHeight: 1.4
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 700,
+    marginBottom: 8
+  },
+  metaRow: {
+    marginBottom: 4
+  },
+  metaLabel: {
+    fontWeight: 600
+  },
+  section: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e2e2",
+    borderTopStyle: "solid"
+  },
+  blockTitle: {
+    fontSize: 14,
+    fontWeight: 700,
+    marginBottom: 4
+  },
+  blockPurpose: {
+    fontSize: 11,
+    marginBottom: 6
+  },
+  item: {
+    marginBottom: 3
+  },
+  itemLabel: {
+    fontWeight: 600
+  }
+});
+
 export async function exportPage(
   workspaceId: string,
   projectId: string,
@@ -129,7 +178,6 @@ export async function exportPage(
     const blockName = blockTypeLabel(blockType);
     const purpose = blockPurpose(blockType);
     const items: Array<{ label: string; value: string }> = [];
-    const jsonFields = buildJsonFields(blockType, fields, block.index, registerAsset);
 
     const headingText = fields.heading?.text;
     const headingLevel = fields.heading?.level;
@@ -304,130 +352,124 @@ export async function exportPage(
       name: blockName,
       purpose,
       items,
-      jsonFields,
       type: blockType,
-      order: block.order,
-      fields
+      order: block.order
     };
   });
 
-  const docParagraphs: Paragraph[] = [
-    new Paragraph({
-      text: "Content Stage Page Handover",
-      heading: HeadingLevel.HEADING_1
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Page title: ", bold: true }),
-        new TextRun(pageTitle)
-      ]
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "URL / slug: ", bold: true }),
-        new TextRun(slug ? `/${slug}` : "Not set")
-      ]
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Meta title: ", bold: true }),
-        new TextRun(metaTitle || "Not set")
-      ]
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Meta description: ", bold: true }),
-        new TextRun(metaDescription || "Not set")
-      ]
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Page status: ", bold: true }),
-        new TextRun(pageStatus)
-      ]
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Export date: ", bold: true }),
-        new TextRun(exportDate.toLocaleString())
-      ]
-    }),
-    new Paragraph({ text: "" })
-  ];
+  const pdfDocument = createElement(
+    PdfDocument,
+    null,
+    createElement(
+      PdfPage,
+      { size: "A4", style: pdfStyles.page },
+      createElement(Text, { style: pdfStyles.title }, "Content Stage Page Handover"),
+      createElement(
+        View,
+        { style: pdfStyles.metaRow },
+        createElement(
+          Text,
+          null,
+          createElement(Text, { style: pdfStyles.metaLabel }, "Page title: "),
+          pageTitle
+        )
+      ),
+      createElement(
+        View,
+        { style: pdfStyles.metaRow },
+        createElement(
+          Text,
+          null,
+          createElement(Text, { style: pdfStyles.metaLabel }, "URL / slug: "),
+          slug ? `/${slug}` : "Not set"
+        )
+      ),
+      createElement(
+        View,
+        { style: pdfStyles.metaRow },
+        createElement(
+          Text,
+          null,
+          createElement(Text, { style: pdfStyles.metaLabel }, "Meta title: "),
+          metaTitle || "Not set"
+        )
+      ),
+      createElement(
+        View,
+        { style: pdfStyles.metaRow },
+        createElement(
+          Text,
+          null,
+          createElement(Text, { style: pdfStyles.metaLabel }, "Meta description: "),
+          metaDescription || "Not set"
+        )
+      ),
+      createElement(
+        View,
+        { style: pdfStyles.metaRow },
+        createElement(
+          Text,
+          null,
+          createElement(Text, { style: pdfStyles.metaLabel }, "Page status: "),
+          pageStatus
+        )
+      ),
+      createElement(
+        View,
+        { style: pdfStyles.metaRow },
+        createElement(
+          Text,
+          null,
+          createElement(Text, { style: pdfStyles.metaLabel }, "Export date: "),
+          exportDate.toLocaleString()
+        )
+      ),
+      ...blockExports.map((block, idx) =>
+        createElement(
+          View,
+          { key: `${block.type}-${block.order}`, style: pdfStyles.section },
+          createElement(
+            Text,
+            { style: pdfStyles.blockTitle },
+            `Block ${idx + 1}: ${block.name}`
+          ),
+          createElement(
+            Text,
+            { style: pdfStyles.blockPurpose },
+            createElement(Text, { style: pdfStyles.metaLabel }, "Purpose: "),
+            block.purpose
+          ),
+          ...block.items.map((item, itemIdx) =>
+            createElement(
+              Text,
+              { key: `${block.type}-${itemIdx}`, style: pdfStyles.item },
+              createElement(Text, { style: pdfStyles.itemLabel }, `${item.label}: `),
+              item.value || "Not set"
+            )
+          )
+        )
+      )
+    )
+  );
 
-  blockExports.forEach((block, idx) => {
-    docParagraphs.push(
-      new Paragraph({
-        text: `Block ${idx + 1}: ${block.name}`,
-        heading: HeadingLevel.HEADING_2
-      })
-    );
-    docParagraphs.push(
-      new Paragraph({
-        children: [new TextRun({ text: "Purpose: ", bold: true }), new TextRun(block.purpose)]
-      })
-    );
-    block.items.forEach((item) => {
-      docParagraphs.push(
-        new Paragraph({
-          children: [
-            new TextRun({ text: `${item.label}: `, bold: true }),
-            new TextRun(item.value || "Not set")
-          ]
-        })
-      );
-    });
-    docParagraphs.push(new Paragraph({ text: "" }));
-  });
-
-  const handoverDoc = new Document({
-    sections: [
-      {
-        properties: {},
-        children: docParagraphs
-      }
-    ]
-  });
-
-  const docBlob = await Packer.toBlob(handoverDoc);
-  downloadBlob(`content-stage-page-${slug || pageSnapshot.id}-handover.docx`, docBlob);
-
-  const jsonPayload = {
-    page: {
-      id: pageSnapshot.id,
-      title: pageTitle,
-      slug,
-      metaTitle,
-      metaDescription,
-      status: pageStatus,
-      exportDate: exportDate.toISOString()
-    },
-    blocks: blockExports.map((block) => ({
-      type: block.type,
-      name: block.name,
-      purpose: block.purpose,
-      order: block.order,
-      fields: block.jsonFields
-    }))
-  };
-  downloadJson(`content-stage-page-${slug || pageSnapshot.id}-handover.json`, jsonPayload);
+  const pdfBlob = await pdf(pdfDocument).toBlob();
+  downloadBlob(`content-stage-page-${slug || pageSnapshot.id}-handover.pdf`, pdfBlob);
 
   if (assetIndex.size > 0) {
-    const zip = new JSZip();
-    const assetsFolder = zip.folder(`content-stage-page-${slug || pageSnapshot.id}-assets`);
-    if (assetsFolder) {
-      const results = await Promise.allSettled(
-        Array.from(assetIndex.values()).map(async (asset) => {
-          const fileRef = ref(storage, asset.url);
-          const blob = await getBlob(fileRef);
-          assetsFolder.file(asset.filename, blob);
-        })
-      );
-      const hasFiles = results.some((result) => result.status === "fulfilled");
-      if (hasFiles) {
-        const zipBlob = await zip.generateAsync({ type: "blob" });
-        downloadBlob(`content-stage-page-${slug || pageSnapshot.id}-assets.zip`, zipBlob);
-      }
+    const callable = httpsCallable(functions, "exportPageAssetsZip");
+    const response = await callable({
+      workspaceId,
+      projectId,
+      pageId,
+      assets: Array.from(assetIndex.values()),
+      fileBase: `content-stage-page-${slug || pageSnapshot.id}-assets.zip`
+    });
+    const payload = response.data as { url?: string };
+    if (payload?.url) {
+      const link = document.createElement("a");
+      link.href = payload.url;
+      link.download = `content-stage-page-${slug || pageSnapshot.id}-assets.zip`;
+      link.click();
     }
   }
 }
@@ -504,149 +546,3 @@ function buildAssetFilename(context: string, url: string, usedNames: Set<string>
   return candidate;
 }
 
-function buildJsonFields(
-  blockType: string,
-  fields: any,
-  blockIndex: number,
-  registerAsset: (url: string | undefined, context: string) => string
-) {
-  switch (blockType) {
-    case "hero":
-      return {
-        heading: {
-          text: fields.heading?.text || "",
-          level: String(fields.heading?.level || "h1")
-        },
-        body: fields.body || "",
-        primaryButton: fields.primaryButton || { label: "", url: "" },
-        secondaryButton: fields.secondaryButton || { label: "", url: "" },
-        textAlignment: fields.textAlignment || "left",
-        mediaAlignment: fields.mediaAlignment || "right",
-        textColor: fields.textColor || "black",
-        behindMediaOverlay: Boolean(fields.behindMediaOverlay),
-        media: fields.media?.src
-          ? {
-              file: registerAsset(fields.media.src, `${blockIndex + 1}-hero-media`),
-              type: fields.media?.type || "image",
-              alt: fields.media?.alt || "",
-              caption: fields.media?.caption || ""
-            }
-          : null
-      };
-    case "banner":
-      return {
-        heading: {
-          text: fields.heading?.text || "",
-          level: String(fields.heading?.level || "h2")
-        },
-        body: fields.body || "",
-        primaryButton: fields.primaryButton || { label: "", url: "" },
-        secondaryButton: fields.secondaryButton || { label: "", url: "" },
-        textAlignment: fields.textAlignment || "left",
-        mediaAlignment: fields.mediaAlignment || "right",
-        textColor: fields.textColor || "black",
-        media: fields.media?.src
-          ? {
-              file: registerAsset(fields.media.src, `${blockIndex + 1}-banner-media`),
-              type: fields.media?.type || "image",
-              alt: fields.media?.alt || "",
-              caption: fields.media?.caption || ""
-            }
-          : null
-      };
-    case "content":
-      return {
-        eyebrow: fields.eyebrow || "",
-        heading: {
-          text: fields.heading?.text || "",
-          level: String(fields.heading?.level || "h2")
-        },
-        body: fields.body || "",
-        primaryButton: fields.primaryButton || { label: "", url: "" },
-        secondaryButton: fields.secondaryButton || { label: "", url: "" },
-        imagePosition: fields.imagePosition || "right",
-        media: fields.media?.src
-          ? {
-              file: registerAsset(fields.media.src, `${blockIndex + 1}-content-media`),
-              type: fields.media?.type || "image",
-              alt: fields.media?.alt || "",
-              caption: fields.media?.caption || ""
-            }
-          : null
-      };
-    case "card_list":
-      return {
-        heading: {
-          text: fields.heading?.text || "",
-          level: String(fields.heading?.level || "h2")
-        },
-        description: fields.description || "",
-        primaryButton: fields.primaryButton || { label: "", url: "" },
-        displayMode: fields.displayMode || "grid",
-        columns: fields.columns || 3,
-        imagePosition: fields.imagePosition || "top",
-        imageAspectRatio: fields.imageAspectRatio || "16:9",
-        cards: Array.isArray(fields.cards)
-          ? fields.cards.map((card: any, cardIndex: number) => ({
-              heading: card.heading || "",
-              description: card.description || "",
-              eyebrow: card.eyebrow || "",
-              image: card.imageUrl
-                ? registerAsset(
-                    card.imageUrl,
-                    `${blockIndex + 1}-card-list-card-${cardIndex + 1}`
-                  )
-                : "",
-              button: card.button || { label: "", url: "" }
-            }))
-          : []
-      };
-    case "tab_content":
-      return {
-        mainHeading: {
-          text: fields.mainHeading?.text || "",
-          level: String(fields.mainHeading?.level || "h2")
-        },
-        mainDescription: fields.mainDescription || "",
-        tabs: Array.isArray(fields.tabs)
-          ? fields.tabs.map((tab: any, tabIndex: number) => ({
-              name: tab.name || "",
-              heading: {
-                text: tab.heading?.text || "",
-                level: String(tab.heading?.level || "h3")
-              },
-              body: tab.body || "",
-              eyebrow: tab.eyebrow || "",
-              button: tab.button || { label: "", url: "" },
-              imagePosition: tab.imagePosition || "right",
-              media: tab.media?.src
-                ? registerAsset(
-                    tab.media.src,
-                    `${blockIndex + 1}-tab-content-tab-${tabIndex + 1}`
-                  )
-                : ""
-            }))
-          : []
-      };
-    case "media":
-      return {
-        media: fields.media?.src
-          ? {
-              file: registerAsset(fields.media.src, `${blockIndex + 1}-media-single`),
-              type: fields.media?.type || "image",
-              alt: fields.media?.alt || "",
-              caption: fields.media?.caption || "",
-              aspectRatio: fields.media?.aspectRatio || "16:9",
-              fullWidth: Boolean(fields.media?.fullWidth)
-            }
-          : null,
-        gallery: Array.isArray(fields.gallery)
-          ? fields.gallery.map((item: any, itemIndex: number) =>
-              registerAsset(item?.src, `${blockIndex + 1}-media-gallery-${itemIndex + 1}`)
-            )
-          : []
-      };
-    default:
-      return fields || {};
-  }
-}
