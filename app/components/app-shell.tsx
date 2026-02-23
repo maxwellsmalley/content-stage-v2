@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Button } from "./ui";
 import { useAuth } from "./auth-provider";
 
@@ -9,6 +10,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const { user, workspaceMembership, systemRole, signOut } = useAuth();
   const workspaceId = workspaceMembership?.workspaceId;
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const hideBackToWorkspace = Boolean(pathname?.match(/^\/workspaces\/[^/]+$/));
 
   const userEmail = useMemo(() => user?.email || "Signed out", [user?.email]);
   return (
@@ -21,19 +24,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       >
         <div className="app-shell-header">
           <div className="row" style={{ gap: 12 }}>
-            <Link
-              href={workspaceId ? `/workspaces/${workspaceId}` : "/"}
-              className="row"
-              style={{
-                gap: 8,
-                border: "1px solid #e0e0e0",
-                borderRadius: 999,
-                padding: "6px 10px"
-              }}
-            >
-              <ArrowLeft />
-              <span style={{ fontSize: 12 }}>Back to workspace</span>
-            </Link>
+            {!hideBackToWorkspace && (
+              <Link
+                href={workspaceId ? `/workspaces/${workspaceId}` : "/"}
+                className="row"
+                style={{
+                  gap: 8,
+                  border: "1px solid #e0e0e0",
+                  borderRadius: 999,
+                  padding: "6px 10px"
+                }}
+              >
+                <ArrowLeft />
+                <span style={{ fontSize: 12 }}>Back to workspace</span>
+              </Link>
+            )}
             <strong style={{ fontSize: 15 }}>Content Stage</strong>
           </div>
           <div className="row" style={{ gap: 12, alignItems: "center" }}>

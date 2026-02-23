@@ -1183,41 +1183,77 @@ export default function PageEditor() {
               <span className="muted" style={{ fontSize: 12 }}>
                 Page Editor
               </span>
-              <Button
-                variant="secondary"
-                onClick={handleExport}
-                style={{
-                  borderRadius: 999,
-                  padding: "6px 12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  color: "#4b4b4b",
-                  borderColor: "#e0e0e0",
-                  background: "#ffffff",
-                  fontSize: 12
-                }}
-              >
-                <span>Export Page</span>
-                <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
-                  <path
-                    d="M12 4v10m0 0l4-4m-4 4l-4-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M4 20h16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </Button>
+              <div className="row" style={{ gap: 8 }}>
+                <Link
+                  href={`/workspaces/${workspaceId}/projects/${projectId}/pages/${pageId}/handover`}
+                  style={{
+                    border: "1px solid #e0e0e0",
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#4b4b4b",
+                    fontSize: 12,
+                    background: "#ffffff"
+                  }}
+                >
+                  <span>Handover View</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M7 4h7l3 3v13H7z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M14 4v3h3"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </Link>
+                <Button
+                  variant="secondary"
+                  onClick={handleExport}
+                  style={{
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: "#4b4b4b",
+                    borderColor: "#e0e0e0",
+                    background: "#ffffff",
+                    fontSize: 12
+                  }}
+                >
+                  <span>Export Page</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden>
+                    <path
+                      d="M12 4v10m0 0l4-4m-4 4l-4-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M4 20h16"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </Button>
+              </div>
             </div>
             <div className="stack" style={{ alignItems: "center", gap: 6 }}>
               <div className="row" style={{ gap: 8, alignItems: "center" }}>

@@ -299,6 +299,15 @@ export default function ProjectOverviewPage() {
             tone="danger"
             onClick={() => handleDeletePage(page.id)}
           />
+          <IconButton
+            label="Handover view"
+            icon="eye"
+            onClick={() =>
+              router.push(
+                `/workspaces/${workspaceId}/projects/${projectId}/pages/${page.id}/handover`
+              )
+            }
+          />
         </div>
       </div>
       ));
