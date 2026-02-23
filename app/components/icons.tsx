@@ -12,6 +12,7 @@ export function IconButton({
     | "chevron-right"
     | "chevron-down"
     | "edit"
+    | "eye"
     | "trash"
     | "grip"
     | "folder";
@@ -70,6 +71,16 @@ export function IconGlyph({ name }: { name: string }) {
         <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
           <path d="M4 17l4 3 12-12-4-3-12 12z" {...common} />
           <path d="M14 5l4 3" {...common} />
+        </svg>
+      );
+    case "eye":
+      return (
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+          <path
+            d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6z"
+            {...common}
+          />
+          <circle cx="12" cy="12" r="3" {...common} />
         </svg>
       );
     case "grip":
