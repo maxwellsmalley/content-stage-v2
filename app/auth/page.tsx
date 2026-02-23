@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { signIn, register } from "@/lib/services/auth";
 import { Button, Input } from "@/app/components/ui";
 import { useAuth } from "@/app/components/auth-provider";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -12,7 +14,10 @@ export default function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   async function handleSignIn() {
     setError("");
@@ -37,6 +42,24 @@ export default function AuthPage() {
       setError("Unable to create account. Check your details and try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setResetMessage("");
+    setResetError("");
+    if (!email.trim()) {
+      setResetError("Enter your email to reset your password.");
+      return;
+    }
+    try {
+      setResetLoading(true);
+      await sendPasswordResetEmail(auth, email.trim());
+      setResetMessage("Password reset email sent. Check your inbox.");
+    } catch (err) {
+      setResetError("Unable to send reset email. Check the address and try again.");
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -71,6 +94,26 @@ export default function AuthPage() {
             placeholder="Password"
             type="password"
           />
+          <button
+            type="button"
+            onClick={handleForgotPassword}
+            disabled={resetLoading}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "#1b1b1b",
+              fontSize: 13,
+              textDecoration: "underline",
+              alignSelf: "flex-start",
+              cursor: resetLoading ? "default" : "pointer",
+              textAlign: "left"
+            }}
+          >
+            {resetLoading ? "Sending reset email..." : "Forgot password?"}
+          </button>
+          {resetMessage && <p style={{ color: "#1b5e20" }}>{resetMessage}</p>}
+          {resetError && <p style={{ color: "#a10d0d" }}>{resetError}</p>}
           {error && <p style={{ color: "#a10d0d" }}>{error}</p>}
           <div className="row">
             <Button variant="primary" onClick={handleSignIn} disabled={loading}>

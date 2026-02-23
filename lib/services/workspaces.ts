@@ -81,8 +81,35 @@ export async function upsertWorkspaceMember(
       role: member.role,
       email: member.email || "",
       displayName: member.displayName || "",
+      status: member.status || "active",
+      createdAt: member.createdAt || "",
       updatedAt: Timestamp.now()
     },
     { merge: true }
   );
+}
+
+export async function listWorkspaceMembers(
+  workspaceId: string
+): Promise<WorkspaceMember[]> {
+  const snapshot = await getDocs(
+    query(
+      collection(db, "workspaces", workspaceId, "workspaceMembers"),
+      orderBy("email")
+    )
+  );
+  return snapshot.docs.map((docItem) => {
+    const data = docItem.data();
+    return {
+      workspaceId,
+      userId: docItem.id,
+      role: data.role,
+      email: data.email,
+      displayName: data.displayName,
+      status: data.status,
+      createdAt: data.createdAt?.toDate
+        ? data.createdAt.toDate().toISOString()
+        : data.createdAt
+    };
+  });
 }

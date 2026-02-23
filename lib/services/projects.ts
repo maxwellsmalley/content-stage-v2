@@ -14,6 +14,13 @@ import {
 import { db } from "@/lib/firebase";
 import { Project, ProjectMember } from "../models/types";
 
+export type ProjectMemberAssignment = {
+  id: string;
+  projectId: string;
+  userId: string;
+  role?: "editor" | "viewer";
+};
+
 export async function createProject(
   workspaceId: string,
   name: string,
@@ -129,4 +136,33 @@ export async function hasProjectAccess(
     )
   );
   return snapshot.exists();
+}
+
+export async function listProjectMembersForWorkspace(
+  workspaceId: string,
+  projects: Project[]
+): Promise<ProjectMemberAssignment[]> {
+  const assignments: ProjectMemberAssignment[] = [];
+  for (const project of projects) {
+    const snapshot = await getDocs(
+      collection(
+        db,
+        "workspaces",
+        workspaceId,
+        "projects",
+        project.id,
+        "projectMembers"
+      )
+    );
+    snapshot.forEach((docItem) => {
+      const data = docItem.data();
+      assignments.push({
+        id: docItem.id,
+        projectId: project.id,
+        userId: String(data.userId || ""),
+        role: data.role
+      });
+    });
+  }
+  return assignments;
 }

@@ -168,9 +168,11 @@ export type Workspace = {
 export type WorkspaceMember = {
   workspaceId: string;
   userId: string;
-  role: Exclude<Role, "super_admin">;
+  role: "admin" | "editor" | "viewer";
   email?: string;
   displayName?: string;
+  status?: "invited" | "active";
+  createdAt?: string;
 };
 
 export type SystemRole = {
