@@ -120,7 +120,7 @@ function headingSummary(fields: BlockFields) {
   return headingText ? `"${headingText}"` : "No heading";
 }
 
-function buildButtonFields(label: string, button?: ButtonField) {
+function buildButtonFields(label: string, button?: ButtonField): FieldItem[] {
   return [
     {
       id: `${label}-label`,
