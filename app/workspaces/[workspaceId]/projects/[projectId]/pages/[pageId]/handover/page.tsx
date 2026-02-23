@@ -56,7 +56,7 @@ function fileNameFromUrl(url: string) {
   }
 }
 
-function isEmptyValue(value: any) {
+function isEmptyValue(value: any): boolean {
   if (value === null || value === undefined || value === "") return true;
   if (Array.isArray(value)) return value.length === 0;
   if (typeof value === "object") {
